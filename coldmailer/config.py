@@ -89,6 +89,28 @@ class Identity:
         "Not relevant? Reply 'unsubscribe' and I won't contact you again."
     )
 
+    # How much compliance boilerplate to append.
+    #
+    #   full     postal address + opt-out line. Required by CAN-SPAM for
+    #            commercial marketing mail. Also unmistakably signals "mass
+    #            mailing" to the reader.
+    #   minimal  one polite opt-out line, no address.
+    #   none     nothing. Correct for genuine person-to-person outreach -
+    #            job applications, research enquiries - where the message is
+    #            not advertising a product and a footer would only make a
+    #            personal note look automated.
+    footer: str = "full"
+
+    # Merge fields available to every template without repeating them in the
+    # CSV: your name, resume link, availability, and so on. A column in the
+    # contact file with the same name wins.
+    vars: dict[str, str] = field(default_factory=dict)
+
+    @property
+    def is_bulk(self) -> bool:
+        """True when this is marketing mail that needs unsubscribe machinery."""
+        return self.footer != "none"
+
 
 @dataclass
 class Tracking:
@@ -207,20 +229,43 @@ def load_config(path: str | Path, *, require_passwords: bool = True) -> Config:
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
     identity_raw = raw.get("identity") or {}
-    missing = [k for k in ("from_name", "physical_address", "unsubscribe_mailto") if not identity_raw.get(k)]
+
+    footer_mode = str(identity_raw.get("footer", "full")).lower()
+    if footer_mode not in ("full", "minimal", "none"):
+        raise ConfigError(f"identity.footer must be full, minimal or none - got {footer_mode!r}")
+
+    required = ["from_name"]
+    if footer_mode == "full":
+        required += ["physical_address", "unsubscribe_mailto"]
+    elif footer_mode == "minimal":
+        required += ["unsubscribe_mailto"]
+
+    missing = [k for k in required if not identity_raw.get(k)]
     if missing:
+        detail = ""
+        if footer_mode == "full":
+            detail = (
+                " A physical postal address and a working unsubscribe route are "
+                "required by CAN-SPAM for commercial marketing email. If this is "
+                "person-to-person outreach rather than marketing - a job "
+                "application, a research enquiry - set identity.footer: none."
+            )
         raise ConfigError(
-            "identity is missing required field(s): "
-            + ", ".join(missing)
-            + ". A physical postal address and a working unsubscribe route are "
-            "legally required by CAN-SPAM for commercial email."
+            "identity is missing required field(s): " + ", ".join(missing) + "." + detail
         )
+
+    identity_vars = identity_raw.get("vars") or {}
+    if not isinstance(identity_vars, dict):
+        raise ConfigError("identity.vars must be a mapping of name: value")
+
     identity = Identity(
         from_name=identity_raw["from_name"],
         company=identity_raw.get("company", ""),
-        physical_address=identity_raw["physical_address"],
-        unsubscribe_mailto=identity_raw["unsubscribe_mailto"],
+        physical_address=identity_raw.get("physical_address", ""),
+        unsubscribe_mailto=identity_raw.get("unsubscribe_mailto", ""),
         unsubscribe_line=identity_raw.get("unsubscribe_line", Identity.unsubscribe_line),
+        footer=footer_mode,
+        vars={str(k): str(v) for k, v in identity_vars.items()},
     )
 
     sending_raw = raw.get("sending") or {}

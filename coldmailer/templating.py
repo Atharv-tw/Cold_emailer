@@ -24,6 +24,15 @@ SPIN_RE = re.compile(r"\{([^{}]+)\}")
 PLACEHOLDER = "\x00M{}\x00"
 
 # Words that reliably trip spam filters in cold outreach.
+# Legitimate technical terms that would otherwise trip the ALL-CAPS check.
+TECH_ACRONYMS = {
+    "LSTM", "BERT", "CUDA", "CNNS", "RNNS", "LLMS", "LLM", "GPUS", "TPUS",
+    "REST", "JSON", "YAML", "HTML", "HTTP", "HTTPS", "SQL", "NOSQL", "ETL",
+    "SAAS", "REPL", "CI", "CD", "API", "APIS", "PYTORCH", "RAG", "SLAM",
+    "MLOPS", "AUTOML", "IMAGENET", "COCO", "MNIST", "SOTA", "ROC", "AUC",
+    "GAN", "GANS", "VAE", "PPO", "SFT", "RLHF", "PHD", "MSC", "BSC", "CGPA",
+}
+
 SPAM_TRIGGERS = [
     "act now", "buy now", "click here", "free trial", "guarantee",
     "limited time", "no obligation", "risk free", "special promotion",
@@ -47,8 +56,15 @@ class Rendered:
         return not self.missing
 
 
-def contact_fields(contact: sqlite3.Row | dict[str, Any]) -> dict[str, str]:
-    """Flatten a contact row into the dict available to templates."""
+def contact_fields(
+    contact: sqlite3.Row | dict[str, Any],
+    extra: dict[str, str] | None = None,
+) -> dict[str, str]:
+    """Flatten a contact row into the dict available to templates.
+
+    `extra` holds config-level globals (your name, resume link, availability).
+    A column in the contact CSV with the same name overrides them.
+    """
     row = dict(contact)
     custom_raw = row.get("custom") or "{}"
     try:
@@ -56,7 +72,8 @@ def contact_fields(contact: sqlite3.Row | dict[str, Any]) -> dict[str, str]:
     except (TypeError, ValueError):
         custom = {}
 
-    fields: dict[str, str] = {k: str(v) for k, v in custom.items() if v is not None}
+    fields: dict[str, str] = {k: str(v) for k, v in (extra or {}).items()}
+    fields.update({k: str(v) for k, v in custom.items() if v is not None})
     for key in ("email", "first_name", "last_name", "company", "title", "campaign"):
         if row.get(key) is not None:
             fields[key] = str(row[key])
@@ -111,7 +128,18 @@ def render(
 
 
 def build_footer(identity, unsub_token: str = "") -> str:
-    """CAN-SPAM footer: opt-out route plus a physical postal address."""
+    """Compliance footer, sized to what the mail actually is.
+
+    Marketing mail needs the CAN-SPAM block. A job application does not, and
+    appending one to a personal note makes it read as a mass mailing - which
+    costs replies for no legal benefit.
+    """
+    mode = getattr(identity, "footer", "full")
+    if mode == "none":
+        return ""
+    if mode == "minimal":
+        return "\n".join(["", "--", identity.unsubscribe_line])
+
     lines = ["", "--", identity.unsubscribe_line]
     if identity.company:
         lines.append(f"{identity.company} · {identity.physical_address}")
@@ -128,9 +156,12 @@ def render_step(
     thread_subject: str | None = None,
     rng: random.Random | None = None,
     include_footer: bool = True,
+    extra_fields: dict[str, str] | None = None,
 ) -> Rendered:
     """Render one sequence step for one contact."""
-    fields = contact_fields(contact)
+    if extra_fields is None:
+        extra_fields = getattr(identity, "vars", None) or {}
+    fields = contact_fields(contact, extra_fields)
     missing: list[str] = []
 
     raw_subject = step.get("subject")
@@ -146,7 +177,9 @@ def render_step(
     body = render(str(step.get("body", "")), fields, rng=rng, missing=missing)
     body = body.rstrip()
     if include_footer:
-        body += "\n" + build_footer(identity, str(dict(contact).get("unsub_token", "")))
+        footer = build_footer(identity, str(dict(contact).get("unsub_token", "")))
+        if footer:
+            body += "\n" + footer
 
     return Rendered(subject=subject.strip(), body=body, missing=sorted(set(missing)))
 
@@ -170,8 +203,11 @@ def lint(text: str) -> list[str]:
     if text.count("!") > 1:
         warnings.append("more than one exclamation mark")
 
-    if re.search(r"\b[A-Z]{4,}\b", text):
-        warnings.append("ALL-CAPS words")
+    shouty = {
+        word for word in re.findall(r"\b[A-Z]{4,}\b", text) if word not in TECH_ACRONYMS
+    }
+    if shouty:
+        warnings.append(f"ALL-CAPS words: {', '.join(sorted(shouty))}")
 
     if "<img" in lowered or "<table" in lowered:
         warnings.append("HTML markup - plain text lands in the inbox more often")

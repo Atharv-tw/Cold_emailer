@@ -64,15 +64,16 @@ def build_message(cfg: Config, mailbox: Mailbox, out: Outgoing) -> EmailMessage:
         references = f"{out.references} {out.in_reply_to}".strip()
         msg["References"] = references
 
-    # Unsubscribe headers. Gmail requires these above trivial volume.
-    unsub_targets = [
-        f"<mailto:{cfg.identity.unsubscribe_mailto}?subject=unsubscribe>"
-    ]
-    if cfg.tracking.base_url and out.unsub_token:
-        url = f"{cfg.tracking.base_url}/u/{quote(out.unsub_token)}"
-        unsub_targets.insert(0, f"<{url}>")
-        msg["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
-    msg["List-Unsubscribe"] = ", ".join(unsub_targets)
+    # Unsubscribe headers, for bulk mail only. Gmail requires them of large
+    # senders, but on genuine person-to-person mail they mark an otherwise
+    # normal email as a mailing-list blast, which costs replies.
+    if cfg.identity.is_bulk and cfg.identity.unsubscribe_mailto:
+        unsub_targets = [f"<mailto:{cfg.identity.unsubscribe_mailto}?subject=unsubscribe>"]
+        if cfg.tracking.base_url and out.unsub_token:
+            url = f"{cfg.tracking.base_url}/u/{quote(out.unsub_token)}"
+            unsub_targets.insert(0, f"<{url}>")
+            msg["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
+        msg["List-Unsubscribe"] = ", ".join(unsub_targets)
 
     # Plain text is the default on purpose: it looks like a person typed it,
     # and it consistently outperforms HTML for cold outreach.
