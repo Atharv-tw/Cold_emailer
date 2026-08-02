@@ -1,0 +1,33 @@
+# Secrets and credentials - never commit these
+config.yaml
+.env
+env.ps1
+*.pem
+*.key
+
+# Local state
+*.db
+*.db-wal
+*.db-shm
+run.log
+
+# Contact lists are personal data - keep them out of version control
+contacts*.csv
+leads*.csv
+*-list.csv
+!contacts.example.csv
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
