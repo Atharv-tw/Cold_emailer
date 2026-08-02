@@ -1,12 +1,15 @@
-# Copy to config.yaml and edit. config.yaml is gitignored.
-# Passwords are NEVER stored here - only the name of an environment variable.
+# Copy to config.yaml and edit. config.yaml is gitignored - your real name,
+# address and mailbox belong there, never in this file.
+#
+# Passwords are NEVER stored in either file - only the name of an environment
+# variable that holds one.
 #
 # Set up for personal outreach from a single Gmail account: internship
 # enquiries, not marketing. See README.md for what changes if you ever point
 # this at commercial email.
 
 identity:
-  from_name: "Atharv Tiwari"
+  from_name: "Your Name"
   company: ""
 
   # No compliance footer. This is person-to-person mail - an internship
@@ -18,50 +21,46 @@ identity:
   # Merge fields available in every template, so you don't repeat them in
   # every CSV row. A CSV column with the same name overrides these.
   vars:
-    my_name: "Atharv Tiwari"
-    my_first_name: "Atharv"
+    my_name: "Your Name"
+    my_first_name: "Your"
 
-    # CHECK THIS. Resume said 2nd-year as of mid-2026; B.Tech runs 2024-2028,
-    # so you are starting year three now. Change if that's wrong.
     my_status: "a third-year CSE undergrad"
-    university: "GGSIPU, Delhi"
+    university: "Your University"
 
-    # REPLACE BOTH. Host the resume somewhere with a stable link - GitHub
-    # Pages, a personal domain, or Drive set to "anyone with the link". A link
-    # beats an attachment: attachments from unknown senders get filtered more
-    # often, and a Drive link tells you if anyone actually opened it.
-    resume_url: "PUT-YOUR-RESUME-LINK-HERE"
-    portfolio: "https://github.com/Atharv-tw"
-    linkedin: "https://linkedin.com/in/atharvtw"
+    # Host the resume somewhere with a stable link - GitHub Pages, a personal
+    # domain, or Drive set to "anyone with the link". A link beats an
+    # attachment: attachments from unknown senders get filtered more often,
+    # and a Drive link tells you if anyone actually opened it.
+    resume_url: "https://yoursite.example/resume.pdf"
+    portfolio: "https://github.com/yourhandle"
+    linkedin: "https://linkedin.com/in/yourhandle"
 
-    # CHECK THESE. Assumed you're targeting next summer.
     season: "summer"
     year: "2027"
-    availability: "free from May, full-time, based in Delhi and can relocate"
+    availability: "free from May, full-time, can relocate"
 
     # What you want to be hired to do. This lands in subject lines, so keep it
     # short and recognisable to the reader.
     focus: "AI engineering"
 
-    # Your strongest project. Onyx has the hardest numbers on your resume,
-    # which is why it's here rather than HealthVault or Finstar. Swap per
-    # campaign if a different one fits the company better - a fintech should
-    # probably hear about Finstar instead.
-    my_project: "Onyx, an AI-powered DAST platform"
+    # Your strongest project. This and the line below do more work than
+    # anything else in the email - "built a chatbot" is worth nothing, a
+    # number gets a reply. Swap per campaign: a fintech should hear about your
+    # fintech project, a health company about the health one.
+    my_project: "a short phrase naming your strongest project"
 
     # Phrased to read correctly after both "where I ..." and a bullet dash,
-    # since the sequences use it both ways.
+    # since the sequences use it both ways. Start with a past-tense verb.
     my_project_detail: >-
-      built the scanning engine over Subfinder, Nmap and Nuclei, then an LLM
-      triage layer that dedupes raw scanner output at 90%+ accuracy and opens
-      remediation PRs automatically, cutting mean time to repair by around 70%
+      built the thing, and here is the number that proves it worked - a
+      percentage, a latency, an API count, a user count
 
     # Used by the recruiters sequence. One line, strongest signal first.
-    # Deliberately avoids the word "winner" - it reads as a spam trigger, and
-    # "2nd of 200+" is the harder number anyway.
+    # Avoid the word "winner" - it reads as a spam trigger, and a placement
+    # like "2nd of 200+" is the harder number anyway.
     credential: >-
-      CTO at Nexera, placed 2nd of 200+ teams at IEEE T-Hacks 8.0, with
-      production systems shipped across healthcare, civic and fintech
+      your title or role, your best competitive placement, and the domains
+      you have shipped in
 
 
 sending:
@@ -86,7 +85,7 @@ sending:
 
 
 warmup:
-  # Your Gmail is already warm - years of real use - so this is not about
+  # An established personal Gmail is already warm, so this is not about
   # reputation. It is a blast radius limit: if the copy has a mistake in it,
   # you find out after 8 emails, not 200.
   enabled: true
@@ -112,8 +111,8 @@ paths:
 # One mailbox: your own Gmail.
 #
 # No secondary domains, no Google Workspace, no SPF/DKIM/DMARC to configure -
-# Google already handles authentication for gmail.com, and your account has
-# real sending history, which is worth more than any new domain could be.
+# Google already handles authentication for gmail.com, and an established
+# account has real sending history, which is worth more than any new domain.
 #
 # Generate an App Password: myaccount.google.com > Security > 2-Step
 # Verification > App passwords. Requires 2FA. Then:
@@ -121,9 +120,9 @@ paths:
 # ---------------------------------------------------------------------------
 mailboxes:
   - id: personal
-    email: "tiwariatharv01042005@gmail.com"
-    from_name: "Atharv Tiwari"
-    username: "tiwariatharv01042005@gmail.com"
+    email: "you@gmail.com"
+    from_name: "Your Name"
+    username: "you@gmail.com"
     password_env: MB1_PASSWORD
     smtp_host: smtp.gmail.com
     smtp_port: 587
