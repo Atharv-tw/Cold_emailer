@@ -16,11 +16,11 @@ steps:
   # ---------------------------------------------------------------- touch 1
   - id: 1
     delay_business_days: 0
-    subject: "{{season_title|Summer}} {{year}} {{focus}} internship — {{my_name}}"
+    subject: "{{focus}} internship, {{timing_short}} — {{my_name}}"
     body: |
       Hi {{first_name}},
 
-      I'm {{my_status}} at {{university}}, applying for {{season}} {{year}} {{focus}} internships at {{company}}.
+      I'm {{my_status}} at {{university}}, applying for {{focus}} internships at {{company}}, {{timing}}.
 
       Short version:
 
@@ -30,7 +30,7 @@ steps:
 
       Resume: {{resume_url}}
 
-      Is the {{season}} {{year}} cycle open, and should I apply through the portal or is there a better route?
+      Is there an open intake at the moment, and should I apply through the portal or is there a better route?
 
       {{my_first_name}}
 

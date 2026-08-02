@@ -26,7 +26,7 @@ steps:
 
       I've been working on {{my_project}}, where I {{my_project_detail}}.
 
-      I'm looking for a {{season}} {{year}} internship in {{focus}}. Not asking for a referral — just whether {{company}} is taking interns this cycle, and if there's someone on the team worth talking to.
+      I'm looking for an {{focus}} internship {{timing}}. Not asking for a referral — just whether {{company}} is taking interns at the moment, and if there's someone on the team worth talking to.
 
       Resume if it's useful: {{resume_url}}
 

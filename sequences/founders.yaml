@@ -14,7 +14,7 @@ steps:
   # ---------------------------------------------------------------- touch 1
   - id: 1
     delay_business_days: 0
-    subject: "{{focus}} intern for {{company}} — {{availability_short|free from May}}"
+    subject: "{{focus}} intern for {{company}} — {{timing_short}}"
     body: |
       Hi {{first_name}},
 
@@ -22,7 +22,7 @@ steps:
 
       What I've built: {{my_project}}, where I {{my_project_detail}}.
 
-      I'm looking for a {{season}} {{year}} internship, and I'd rather work on whatever's actually blocking you than a curated side project. {{availability}}.
+      I'm looking for an {{focus}} internship {{timing}}, and I'd rather work on whatever's actually blocking you than a curated side project. {{availability}}.
 
       {{resume_url}}
 

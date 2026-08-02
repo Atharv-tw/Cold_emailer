@@ -31,7 +31,7 @@ steps:
 
       My background: {{my_project}}, where I {{my_project_detail}}. Relevant coursework in {{coursework|linear algebra, probability and deep learning}}.
 
-      I'm looking for a {{season}} {{year}} research internship and would be glad to work on {{direction|whatever's most useful to the group, including the unglamorous parts}}. {{availability}}.
+      I'm looking for a research internship {{timing}} and would be glad to work on {{direction|whatever's most useful to the group, including the unglamorous parts}}. {{availability}}.
 
       CV: {{resume_url}}
 

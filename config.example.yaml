@@ -35,12 +35,18 @@ identity:
     portfolio: "https://github.com/yourhandle"
     linkedin: "https://linkedin.com/in/yourhandle"
 
-    season: "summer"
-    year: "2027"
+    # When you can start. `timing` reads inside a sentence, `timing_short`
+    # goes in subject lines. Keep them consistent with each other.
+    #   immediate  -> "starting immediately"   / "immediate start"
+    #   future     -> "for summer 2027"        / "summer 2027"
+    timing: "for summer 2027"
+    timing_short: "summer 2027"
     availability: "free from May, full-time, can relocate"
 
-    # What you want to be hired to do. This lands in subject lines, so keep it
-    # short and recognisable to the reader.
+    # What you want to be hired to do. This lands in subject lines, so it has
+    # to be ONE thing - a list like "AI engineering, backend engineering"
+    # reads badly and weakens the subject. Your second area is covered by the
+    # project detail anyway.
     focus: "AI engineering"
 
     # Your strongest project. This and the line below do more work than
