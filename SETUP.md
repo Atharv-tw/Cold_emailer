@@ -1,134 +1,43 @@
-# Setup runbook
+# Setup runbook — internship outreach
 
-Windows / PowerShell. Follow in order — the waiting periods are not optional,
-and skipping them is the most common way this fails.
+Windows / PowerShell. About 40 minutes end to end, and you can send the same
+day. There is no domain to buy, no DNS to configure, and no warmup period —
+your Gmail already has years of real sending history, which is worth more than
+any new domain could be.
 
-Total hands-on time is about 90 minutes, spread over three weeks of DNS
-propagation and mailbox warmup.
-
----
-
-## Timeline at a glance
-
-| When | What | Hands-on |
-|---|---|---|
-| Day 1 | Buy domains, create mailboxes, publish DNS | ~60 min |
-| Day 1 | Install and configure the tool | ~20 min |
-| Days 2–21 | Warmup: light manual sending, no campaigns | 5 min/day |
-| Day 8 | Verify DNS and inbox placement | ~10 min |
-| Day 22 | First real campaign | — |
+If you are instead using this for commercial marketing email, stop and read
+the "Commercial use" section of `README.md`. Different rules, different risk,
+and considerably more setup.
 
 ---
 
-# Part 1 — Infrastructure (day 1)
+## Step 1 — Gmail app password (5 min)
 
-## Step 1. Buy sending domains
+You need an app password, not your account password.
 
-Buy 2 domains from any registrar (Namecheap, Cloudflare, Porkbun). Do **not**
-use the domain your real email runs on.
+1. Go to myaccount.google.com → Security
+2. Turn on **2-Step Verification** if it isn't already
+3. Search settings for **App passwords**
+4. Create one named `coldmailer`
+5. Copy the 16-character password — it's shown once
 
-Pick variants of your brand:
+## Step 2 — Install (10 min)
 
-```
-get-yourcompany.com
-try-yourcompany.com
-```
-
-Set each to 301-redirect to your main website. A sending domain that resolves
-to nothing is a spam signal.
-
-**Checkpoint:** visiting `get-yourcompany.com` lands on your real site.
-
-## Step 2. Create Google Workspace mailboxes
-
-1. Go to workspace.google.com, start a Business Starter plan on the first
-   sending domain (~£6/user/month).
-2. Verify domain ownership with the TXT record Google gives you.
-3. Create 2 users per domain, using real name variants:
-
-```
-shivanshu@get-yourcompany.com
-s.pandey@get-yourcompany.com
-```
-
-Never `info@`, `sales@`, `hello@`, or `noreply@` — those get filtered on sight.
-
-4. For each mailbox: log in once, set a profile photo, write a short
-   signature, and **turn on 2-Step Verification** (required for app passwords
-   in the next part).
-
-Repeat for the second domain.
-
-**Checkpoint:** you can log into each mailbox and send a normal email.
-
-## Step 3. Publish DNS records
-
-On **every** sending domain, add all three records. Missing any one is the
-number one reason cold email lands in spam.
-
-**SPF** — one TXT record on the root. If you already have an SPF record, merge
-into it rather than adding a second; two SPF records is worse than none.
-
-```
-Type: TXT    Host: @    Value: v=spf1 include:_spf.google.com ~all
-```
-
-**DKIM** — generate the key first: Google Admin → Apps → Google Workspace →
-Gmail → Authenticate email → Generate new record (choose 2048-bit).
-
-```
-Type: TXT    Host: google._domainkey    Value: v=DKIM1; k=rsa; p=<key Google gives you>
-```
-
-Then click **Start authentication** in the Admin console.
-
-**DMARC** — start permissive so you get reports without blocking anything.
-
-```
-Type: TXT    Host: _dmarc    Value: v=DMARC1; p=none; rua=mailto:dmarc@yourdomain.com; pct=100
-```
-
-**Checkpoint** — wait 30 minutes, then in PowerShell:
-
-```powershell
-Resolve-DnsName -Type TXT get-yourcompany.com
-Resolve-DnsName -Type TXT google._domainkey.get-yourcompany.com
-Resolve-DnsName -Type TXT _dmarc.get-yourcompany.com
-```
-
-All three must return the values you set. DNS can take up to 48 hours — do not
-proceed to real sending until they resolve.
-
-## Step 4. Generate app passwords
-
-For each mailbox, logged in as that user:
-
-1. Go to myaccount.google.com → Security → 2-Step Verification → App passwords
-2. Create one named `coldmailer`
-3. Copy the 16-character password (shown once)
-
-Keep them somewhere safe for the next step.
-
----
-
-# Part 2 — Install the tool (day 1)
-
-## Step 5. Check Python
+Check Python first:
 
 ```powershell
 python --version
 ```
 
-Needs 3.10 or newer. If missing, install from python.org and tick
-**"Add Python to PATH"** during install.
-
-## Step 6. Create a virtual environment
+3.10 or newer. If it's missing, install from python.org and tick **"Add Python
+to PATH"**.
 
 ```powershell
 cd $HOME\Desktop\work\email
 
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 ```
 
 If PowerShell blocks the activation script:
@@ -137,188 +46,178 @@ If PowerShell blocks the activation script:
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
-Your prompt should now show `(.venv)`.
-
-```powershell
-pip install -r requirements.txt
-```
-
-## Step 7. Configure
+## Step 3 — Configure (15 min)
 
 ```powershell
 Copy-Item config.example.yaml config.yaml
 notepad config.yaml
 ```
 
-Edit these, at minimum:
+Most of your time goes into `identity.vars`. These fill every template, so you
+write them once instead of in every CSV row:
 
 | Field | Notes |
 |---|---|
-| `identity.from_name` | your real name |
-| `identity.company` | your company |
-| `identity.physical_address` | **real postal address — legally required** |
-| `identity.unsubscribe_mailto` | a mailbox you actually read |
-| `sending.timezone` | `Asia/Kolkata` for IST |
-| `mailboxes[].email` | your new sending addresses |
-| `mailboxes[].username` | same as email |
+| `my_name`, `my_first_name` | as you want to be addressed |
+| `my_status` | "a third-year CS undergrad" |
+| `university` | your institution |
+| `resume_url` | **a link, not an attachment** — see below |
+| `portfolio` | GitHub or personal site |
+| `season`, `year` | "summer", "2027" |
+| `availability` | "free from May, full-time, can relocate" |
+| `focus` | "ML", "applied ML", "NLP" — whatever you actually want |
+| `my_project` | your strongest project, one phrase |
+| `my_project_detail` | what you did and **a number** |
 
-Leave `warmup` alone. The defaults are the safe ones.
+`my_project` and `my_project_detail` do more work than anything else in the
+email. "Built a chatbot" is worth nothing. "Fine-tuned a small embedding model
+that beat ada-002 by 11 points on recall@10" gets a reply. If you don't have a
+number, find one — accuracy, latency, dataset size, users.
 
-## Step 8. Store the app passwords
+**Resume hosting.** Put the PDF somewhere with a stable link: your GitHub Pages
+site, a personal domain, or Google Drive set to "anyone with the link". A link
+beats an attachment — attachments from unknown senders are filtered more often,
+and a Drive link tells you whether anyone actually opened it.
 
-Passwords never go in `config.yaml`. Create `env.ps1` in the project folder —
-it is gitignored:
+Also set `identity.from_name` and the mailbox `email` / `username` to your
+Gmail address. Leave `footer: none` alone — that's what keeps these looking
+like personal emails rather than marketing.
+
+## Step 4 — Store the password
+
+Never in `config.yaml`. Create `env.ps1` (already gitignored):
 
 ```powershell
 @'
 $env:MB1_PASSWORD = "abcd efgh ijkl mnop"
-$env:MB2_PASSWORD = "qrst uvwx yzab cdef"
 '@ | Set-Content env.ps1
 ```
 
-Load it in every new terminal session before running the tool:
+Load it in every new terminal session:
 
 ```powershell
 . .\env.ps1
 ```
 
-## Step 9. Initialize
+## Step 5 — Initialize (2 min)
 
 ```powershell
 python -m coldmailer init
-```
-
-This creates `coldmailer.db`, loads the suppression list, and records the
-current IMAP position for each mailbox so existing mail is never mistaken for
-a reply.
-
-```powershell
 python -m coldmailer mailbox-test
 ```
 
-Every mailbox must print `OK`. If you see an authentication failure, you used
-your account password instead of the 16-character app password, or 2FA is off.
+`mailbox-test` must print `OK`. An authentication failure means you used your
+account password instead of the 16-character app password.
 
-**Checkpoint:** `init` and `mailbox-test` both clean.
-
-## Step 10. Seed the suppression list
-
-Add your own domains so you never cold-email yourself, a colleague, or an
-existing customer:
-
-```powershell
-notepad suppression.txt
-```
-
-```
-yourcompany.com
-gmail.com-addresses-of-your-team@example.com
-```
-
-Then re-run `python -m coldmailer init` to load them.
+Then add your own domains to `suppression.txt` so you never accidentally email
+yourself or a friend, and re-run `init`.
 
 ---
 
-# Part 3 — Warmup (days 2–21)
+## Step 6 — Set your sending window
 
-**Do not run campaigns during this window.** A three-week-old mailbox that
-starts at 10/day and ramps gets delivered. A day-old mailbox sending 40 gets
-filtered, and you lose the domain.
+This one is easy to get wrong. The window in `config.yaml` is in **your**
+timezone, but should cover your **target's** morning — 8–11am their time gets
+the best response.
 
-Each day, from each mailbox, by hand:
+Sending from IST:
 
-- Send 2–3 real emails to colleagues and reply to their replies
-- Subscribe to a couple of newsletters and actually open them
-- Move anything that lands in spam to the inbox
+| Targeting | Set window (IST) |
+|---|---|
+| India | `09:15` – `12:00` |
+| UK / Europe | `13:30` – `16:30` |
+| US East | `18:30` – `21:30` |
+| US West | `21:30` – `23:45` |
 
-The tool's warmup ramp handles the automated side once you start (10/day,
-+3/day, capped at 40) — this part is about giving the mailbox genuine two-way
-history.
-
-## Day 8 checkpoint — verify inbox placement
-
-Send one email from each mailbox to the address shown at
-[mail-tester.com](https://www.mail-tester.com).
-
-**Score 8/10 or better before proceeding.** Below that, the report tells you
-exactly which record is wrong. Fix it and retest — do not start sending on a
-low score.
+Pick one region per campaign rather than trying to cover all of them.
 
 ---
 
-# Part 4 — First campaign (day 22)
+## Step 7 — Build the list
 
-## Step 11. Write the sequence
+Four sequences ship with this, one per audience:
 
-```powershell
-Copy-Item sequences\founders.yaml sequences\mycampaign.yaml
-notepad sequences\mycampaign.yaml
-```
+| Sequence | Who | Expect |
+|---|---|---|
+| `engineers` | people doing the work | **best reply rate** — start here |
+| `founders` | CTOs at small startups | fast yes/no, often creates a role |
+| `professors` | research labs | slow, high effort per email |
+| `recruiters` | talent teams | lowest — expect portal redirects |
 
-Rules that matter more than the wording:
+**Finding people.** Company team pages, GitHub contributors on projects you
+actually use, paper author lists, conference speaker lists, LinkedIn. For
+startups, the "About" page usually lists everyone.
 
-- Under 90 words per email
-- One question, one ask
-- At most one link, ideally zero on the first touch
-- Steps 2+ have **no subject line** — they reply into the same thread
-- Reference something specific about them, not about you
+**Finding addresses.** Most companies use a predictable pattern —
+`first.last@`, `first@`, `flast@`. Find one known address for the company and
+apply the pattern. Hunter.io and Clearbit have free tiers that will confirm a
+guess. Verify before sending: a bounce is a wasted contact and repeated
+bounces from one sender look bad to Gmail.
 
-Preview it with spintax resolved:
-
-```powershell
-python -m coldmailer preview -s mycampaign
-```
-
-Fix anything flagged as a lint warning or a missing field.
-
-## Step 12. Build the contact list
-
-`email` is the only required column. Every other column becomes a merge field.
+**The columns that matter.** `email` is required, everything else becomes a
+merge field:
 
 ```csv
-email,first_name,company,trigger,pain
-dana@examplecorp.com,Dana,ExampleCorp,just opened a second warehouse,reconciling stock across three systems
+email,first_name,last_name,company,specific,specific_short,reaction
+priya@exampleai.com,Priya,Raman,ExampleAI,your post on 4-bit quantised serving,4-bit serving,I tried reproducing the benchmark and got within 2 points
 ```
 
-Verify the addresses first with a service like NeverBounce or ZeroBounce. A
-bounce rate above 3% damages the domain — list hygiene is cheaper than a
-burned domain.
+`specific` is the sentence that proves this isn't a blast. It must be real and
+about *them* — a post they wrote, a feature they shipped, a talk they gave, a
+paper they published. If you cannot write a genuine `specific` for someone,
+take them off the list. That field is doing the work; everything else is
+scaffolding.
 
-## Step 13. Test on yourself first
+The `professors` sequence additionally needs `paper`, `paper_short`, `finding`
+and `question` — and those need to reflect a paper you have actually read.
+
+**One person per company at a time.** Emailing an engineer, the CTO and a
+recruiter at the same company in the same week looks exactly like what it is.
+
+---
+
+## Step 8 — Check the copy before importing
 
 ```powershell
-python -m coldmailer import test-list.csv -s mycampaign --campaign smoke-test
+python -m coldmailer preview -s engineers --csv leads.csv
+```
+
+This renders against the first real row of your list. Fix anything reported as
+a missing field — those emails would be withheld rather than sent with a blank
+gap. Read it out loud. If it sounds like a template, it is one.
+
+## Step 9 — Send one to yourself
+
+```powershell
+python -m coldmailer import me.csv -s engineers --campaign test
 python -m coldmailer run --once
 ```
 
-Use a CSV containing only your own personal address. Check the email that
-arrives: merge fields resolved, footer present, lands in Primary not Promotions.
-
-Then clear it:
+Where `me.csv` contains only your own address plus realistic column values.
+Check what arrives: merge fields resolved, no footer, lands in Primary rather
+than Promotions, resume link works. Then:
 
 ```powershell
-python -m coldmailer suppress your.personal@gmail.com --reason "test"
+python -m coldmailer suppress your.other@email.com --reason "test"
 ```
 
-## Step 14. Go live
+## Step 10 — Go live
 
 ```powershell
-python -m coldmailer import leads.csv -s mycampaign --campaign q3-ops
+python -m coldmailer import leads.csv -s engineers --campaign ml-internships
 python -m coldmailer run --dry-run
 ```
 
-Read the dry-run output carefully. It sends nothing. When it looks right:
+Read the dry-run output. It sends nothing. When it looks right:
 
 ```powershell
 python -m coldmailer run
 ```
 
-Leave that terminal open. It polls for replies and sends whatever is due,
-every 5 minutes, respecting the sending window. Ctrl-C to stop.
+Leave the terminal open. It polls for replies and sends what's due every five
+minutes, inside your window, capped at 8/day rising to 20. Ctrl-C stops it.
 
-## Step 15. Run it unattended
-
-To have it run without a terminal open, use Task Scheduler:
+To run without a terminal open, use Task Scheduler:
 
 ```powershell
 $action = New-ScheduledTaskAction `
@@ -332,59 +231,51 @@ $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) `
 Register-ScheduledTask -TaskName "coldmailer" -Action $action -Trigger $trigger
 ```
 
-The tool enforces the sending window itself, so a five-minute trigger running
-all day is fine — it simply does nothing outside working hours.
-
-To stop it:
-
-```powershell
-Unregister-ScheduledTask -TaskName "coldmailer" -Confirm:$false
-```
+Remove it with `Unregister-ScheduledTask -TaskName "coldmailer" -Confirm:$false`.
 
 ---
 
-# Daily operation
+## Daily operation
 
 ```powershell
-. .\env.ps1                                    # once per terminal session
+. .\env.ps1
 
-python -m coldmailer stats                     # how the campaign is doing
-python -m coldmailer contacts --status replied # who answered
-python -m coldmailer poll                      # force a reply check
-python -m coldmailer suppress a@b.com          # never contact again
+python -m coldmailer stats
+python -m coldmailer contacts --status replied
+python -m coldmailer poll
 ```
 
-## What to watch
+**When someone replies, the sequence stops automatically — then it's on you.**
+Reply within a few hours. That's the entire point of the exercise; the tool
+just gets you to the conversation.
 
-| Metric | Healthy | Act if |
-|---|---|---|
-| Reply rate | 3–8% | under 1% — targeting or offer is wrong, not volume |
-| Bounce rate | under 2% | over 3% — stop, verify the list |
-| Opt-out rate | under 0.3% | over 0.3% — Gmail's threshold, tighten targeting |
+## What good looks like
 
-Under 1% reply rate means sending more will not help and will cost you a
-domain. Fix the list or the offer instead.
+For a student sending well-researched emails to engineers:
+
+| Metric | Expect |
+|---|---|
+| Reply rate | 10–25% — far higher than sales cold email, because you're asking for very little |
+| Useful conversations | 1 in 3 replies |
+| Bounces | under 2% — if higher, your address guessing is wrong |
+
+If you're under 5% after 40 emails, the problem is the `specific` field or the
+project line, not the volume. Sending 200 more of the same email will not help.
+Rewrite, then send another 20.
 
 ## Common problems
-
-**Everything lands in spam.** Check mail-tester score. Usually a missing DKIM
-record or a mailbox pushed too hard too early.
 
 **`authentication failed`.** App password, not account password. 2FA must be on.
 
 **Contacts stuck at `paused`.** A merge field was missing, so the email was
-withheld rather than sent broken. Fix the CSV, then:
+withheld rather than sent with a hole in it. Check with
+`python -m coldmailer contacts --status paused`, fix the CSV, re-import.
 
-```powershell
-python -m coldmailer contacts --status paused
-```
+**Landing in Promotions.** Usually too many links or an over-formatted email.
+Keep it to one link and plain text.
 
-Re-import the corrected rows after deleting the paused ones, or reactivate
-directly:
+**Nothing sends.** Check you're inside your sending window and still have daily
+capacity — `python -m coldmailer stats` shows both.
 
-```powershell
-sqlite3 coldmailer.db "UPDATE contacts SET status='active' WHERE status='paused'"
-```
-
-**Nothing sends.** Check you are inside the sending window and that the mailbox
-still has daily capacity — `python -m coldmailer stats` shows both.
+**Gmail warning about unusual activity.** Back off to 10/day for a week. You're
+using your primary account; be conservative with it.
