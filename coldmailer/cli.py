@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import random
 import re
 import sys
@@ -129,7 +130,30 @@ def cmd_preview(args) -> int:
         print(_colour(f"unknown sequence {args.sequence!r}. Available: {', '.join(sequences) or 'none'}", RED))
         return 1
 
-    if args.email:
+    if args.csv:
+        # Render against the first row of a real list - the only way to see
+        # whether your merge fields actually line up with your data.
+        path = Path(args.csv)
+        if not path.exists():
+            print(_colour(f"no such file: {path}", RED))
+            return 1
+        with path.open(newline="", encoding="utf-8-sig") as handle:
+            reader = csv.DictReader(handle)
+            reader.fieldnames = [_normalise_header(f) for f in (reader.fieldnames or [])]
+            row = next(reader, None)
+        if row is None:
+            print(_colour(f"{path} has no data rows", RED))
+            return 1
+        known = {"email", "first_name", "last_name", "company", "title"}
+        contact_data = {
+            "email": row.get("email", ""), "custom": json.dumps(
+                {k: v for k, v in row.items() if k not in known and v}
+            ),
+            "unsub_token": "preview", "campaign": "preview",
+            **{k: row.get(k, "") for k in known if k != "email"},
+        }
+        print(_colour(f"rendering against {row.get('email', '?')} from {path.name}", DIM))
+    elif args.email:
         contact = store.find_contact_by_email(args.email)
         if contact is None:
             print(_colour(f"no contact {args.email}", RED))
@@ -332,7 +356,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = subparsers.add_parser("preview", help="render a sequence without sending")
     p.add_argument("-s", "--sequence", required=True)
-    p.add_argument("-e", "--email", help="render against a real contact")
+    p.add_argument("-e", "--email", help="render against a contact already imported")
+    p.add_argument("--csv", help="render against the first row of a CSV, before importing")
     p.add_argument("--seed", type=int, default=None, help="fix the spintax RNG")
     p.set_defaults(func=cmd_preview)
 
