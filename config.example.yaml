@@ -48,14 +48,19 @@ identity:
     # campaign if a different one fits the company better - a fintech should
     # probably hear about Finstar instead.
     my_project: "Onyx, an AI-powered DAST platform"
+
+    # Phrased to read correctly after both "where I ..." and a bullet dash,
+    # since the sequences use it both ways.
     my_project_detail: >-
       built the scanning engine over Subfinder, Nmap and Nuclei, then an LLM
       triage layer that dedupes raw scanner output at 90%+ accuracy and opens
-      remediation PRs automatically - cut mean time to repair by around 70%
+      remediation PRs automatically, cutting mean time to repair by around 70%
 
     # Used by the recruiters sequence. One line, strongest signal first.
+    # Deliberately avoids the word "winner" - it reads as a spam trigger, and
+    # "2nd of 200+" is the harder number anyway.
     credential: >-
-      CTO at Nexera, winner of IEEE T-Hacks 8.0 (2nd of 200+ teams), and
+      CTO at Nexera, placed 2nd of 200+ teams at IEEE T-Hacks 8.0, with
       production systems shipped across healthcare, civic and fintech
 
 

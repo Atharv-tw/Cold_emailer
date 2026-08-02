@@ -31,6 +31,10 @@ TECH_ACRONYMS = {
     "SAAS", "REPL", "CI", "CD", "API", "APIS", "PYTORCH", "RAG", "SLAM",
     "MLOPS", "AUTOML", "IMAGENET", "COCO", "MNIST", "SOTA", "ROC", "AUC",
     "GAN", "GANS", "VAE", "PPO", "SFT", "RLHF", "PHD", "MSC", "BSC", "CGPA",
+    # Security, systems and institutions
+    "DAST", "SAST", "SSRF", "SQLI", "IDOR", "MTTR", "RBAC", "OAUTH", "SAML",
+    "IEEE", "ACM", "GGSIPU", "IIIT", "NPTEL", "GPS", "OCR", "CRUD", "GRPC",
+    "WCAG", "SDLC", "GDPR", "HIPAA", "SOC", "AES", "RSA", "JWT", "TLS",
 }
 
 SPAM_TRIGGERS = [

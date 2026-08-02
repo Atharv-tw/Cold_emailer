@@ -65,14 +65,22 @@ write them once instead of in every CSV row:
 | `portfolio` | GitHub or personal site |
 | `season`, `year` | "summer", "2027" |
 | `availability` | "free from May, full-time, can relocate" |
-| `focus` | "ML", "applied ML", "NLP" — whatever you actually want |
+| `focus` | "AI engineering", "backend", "full-stack" — what you want to be hired to do |
 | `my_project` | your strongest project, one phrase |
 | `my_project_detail` | what you did and **a number** |
 
 `my_project` and `my_project_detail` do more work than anything else in the
-email. "Built a chatbot" is worth nothing. "Fine-tuned a small embedding model
-that beat ada-002 by 11 points on recall@10" gets a reply. If you don't have a
-number, find one — accuracy, latency, dataset size, users.
+email. "Built a chatbot" is worth nothing. "Built an LLM triage layer that
+dedupes raw scanner output at 90%+ accuracy and cut MTTR by ~70%" gets a reply.
+If you don't have a number, find one — accuracy, latency, API count, users.
+
+Swap `my_project` per campaign. A fintech should hear about the fintech
+project, a health company about the health one. It's one line in the config
+and it noticeably changes the reply rate.
+
+`my_project_detail` is phrased to read correctly after both "where I …" and a
+bullet dash, because the sequences use it both ways. Keep that shape if you
+rewrite it — start with a past-tense verb.
 
 **Resume hosting.** Put the PDF somewhere with a stable link: your GitHub Pages
 site, a personal domain, or Google Drive set to "anyone with the link". A link
@@ -141,8 +149,15 @@ Four sequences ship with this, one per audience:
 |---|---|---|
 | `engineers` | people doing the work | **best reply rate** — start here |
 | `founders` | CTOs at small startups | fast yes/no, often creates a role |
-| `professors` | research labs | slow, high effort per email |
 | `recruiters` | talent teams | lowest — expect portal redirects |
+| `professors` | research labs | weak fit for a builder profile — see below |
+
+`professors` is included for completeness but is the wrong tool if your
+strength is shipped systems rather than published research. Academics want to
+see that you've read their paper and have a question about the method; a list
+of production projects doesn't answer that. Use it only where you genuinely
+know the work, and expect to write most of each email by hand. `engineers` and
+`founders` are where a builder profile converts.
 
 **Finding people.** Company team pages, GitHub contributors on projects you
 actually use, paper author lists, conference speaker lists, LinkedIn. For

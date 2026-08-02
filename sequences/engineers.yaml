@@ -24,7 +24,7 @@ steps:
 
       I'm {{my_name}}, {{my_status}} at {{university}}. I came across {{specific}} and {{reaction|spent a weekend working through it}}.
 
-      I've been building {{my_project}} — {{my_project_detail}}.
+      I've been working on {{my_project}}, where I {{my_project_detail}}.
 
       I'm looking for a {{season}} {{year}} internship in {{focus}}. Not asking for a referral — just whether {{company}} is taking interns this cycle, and if there's someone on the team worth talking to.
 
