@@ -1,0 +1,45 @@
+name: engineers
+description: >
+  To engineers and researchers actually doing the work you want to do. This is
+  the highest-reply-rate audience for a student by some distance - they are
+  rarely cold-emailed, they remember being in your position, and an internal
+  referral from them carries far more weight than a portal application.
+
+  Two touches. The ask is deliberately small: not "refer me", just "is there
+  someone worth talking to". Easy to say yes to.
+
+  Paragraphs are written as single long lines on purpose - the mail client
+  wraps them to the reader's window. Hard-wrapping here produces ragged text
+  once merge fields are substituted.
+
+stop_on_reply: true
+
+steps:
+  # ---------------------------------------------------------------- touch 1
+  - id: 1
+    delay_business_days: 0
+    subject: "question about {{specific_short}}"
+    body: |
+      Hi {{first_name}},
+
+      I'm {{my_name}}, {{my_status}} at {{university}}. I came across {{specific}} and {{reaction|spent a weekend working through it}}.
+
+      I've been building {{my_project}} — {{my_project_detail}}.
+
+      I'm looking for a {{season}} {{year}} internship in {{focus}}. Not asking for a referral — just whether {{company}} is taking interns this cycle, and if there's someone on the team worth talking to.
+
+      Resume if it's useful: {{resume_url}}
+
+      {{my_first_name}}
+
+  # ---------------------------------------------------------------- touch 2
+  - id: 2
+    delay_business_days: 5
+    body: |
+      Hi {{first_name}},
+
+      Bumping this once in case it got buried.
+
+      Even a one-line "we're not taking interns" helps — I'd rather cross {{company}} off than keep wondering.
+
+      {{my_first_name}}

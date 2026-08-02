@@ -1,50 +1,78 @@
 # Copy to config.yaml and edit. config.yaml is gitignored.
 # Passwords are NEVER stored here - only the name of an environment variable.
+#
+# This example is set up for personal outreach from a single Gmail account:
+# internship and research enquiries, not marketing. See the bottom of the file
+# for what changes if you ever use this for commercial email.
 
 identity:
   from_name: "Shivanshu Pandey"
-  company: "Your Company Ltd"
+  company: ""
 
-  # Legally required by CAN-SPAM on every commercial email. A registered
-  # office or a mailbox service is fine; it has to be a real postal address.
-  physical_address: "221B Example Street, Bengaluru 560001, India"
+  # No compliance footer. This is person-to-person mail - a job enquiry is not
+  # advertising a product, so CAN-SPAM's address and opt-out requirements do
+  # not apply, and bolting them onto a personal note makes it read as a mass
+  # mailing. Set this to "full" only if you switch to marketing email.
+  footer: none
 
-  # Must be a mailbox you actually read and act on.
-  unsubscribe_mailto: "unsubscribe@yourdomain.com"
+  # Merge fields available in every template, so you don't repeat them in
+  # every CSV row. A CSV column with the same name overrides these.
+  vars:
+    my_name: "Shivanshu Pandey"
+    my_first_name: "Shivanshu"
+    my_status: "a third-year CS undergrad"
+    university: "Your University"
 
-  unsubscribe_line: "Not the right person? Reply 'unsubscribe' and I'll stop."
+    # Host the resume somewhere with a stable link. A link beats an attachment:
+    # attachments from unknown senders get filtered more often.
+    resume_url: "https://yoursite.com/resume.pdf"
+    portfolio: "https://github.com/yourhandle"
+
+    season: "summer"
+    year: "2027"
+    availability: "free from May, full-time, can relocate"
+    focus: "ML"
+
+    # Your strongest project. Keep it concrete and quantified - this is the
+    # single line doing the most work in the whole email.
+    my_project: "a retrieval pipeline for 400k support tickets"
+    my_project_detail: >-
+      fine-tuned a small embedding model that beat off-the-shelf ada-002 by
+      11 points on recall@10
 
 
 sending:
-  timezone: "Asia/Kolkata"        # window times below are in this timezone
-  window_start: "09:15"           # deliberately not on the hour - looks human
+  timezone: "Asia/Kolkata"
+
+  # Set this to your TARGET's working hours, not yours. For US companies from
+  # India that means late evening IST; for UK, early evening.
+  window_start: "09:15"
   window_end: "17:30"
   days: [mon, tue, wed, thu, fri]
 
-  # Randomised gap between two sends from the SAME mailbox. Never set these
-  # low enough to produce a machine-gun pattern; 3-15 minutes reads as human.
-  min_gap_seconds: 210
-  max_gap_seconds: 900
+  # Tue-Thu mornings get the best response. Avoid Monday morning and Friday
+  # afternoon by trimming `days` if you want to be strict about it.
 
-  max_per_tick: 5                 # ceiling per `run` pass, across all mailboxes
+  min_gap_seconds: 300
+  max_gap_seconds: 1500
+  max_per_tick: 2
 
 
 warmup:
-  # Daily cap per mailbox, ramping from start_cap on its first send date.
-  # Google's hard limit is 2,000/day but cold volume anywhere near that
-  # destroys deliverability. These numbers are the ones that actually work.
+  # Your Gmail is already warm - years of real use - so this is not about
+  # reputation. It is a blast radius limit: if your copy has a mistake in it,
+  # you find out after 8 emails, not 200.
   enabled: true
-  start_cap: 10
-  increment_per_day: 3
-  max_cap: 40                     # never exceed ~40-50/mailbox for cold mail
+  start_cap: 8
+  increment_per_day: 2
+  max_cap: 20             # do not raise this on a personal Gmail
 
 
 tracking:
-  # Off by default. Pixels are unreliable (Apple MPP and Gmail's proxy
-  # pre-fetch them) and add a small deliverability penalty. Replies are the
-  # real metric. Turn on only if you host coldmailer.tracker behind HTTPS.
+  # Leave off. On personal outreach a tracking pixel is both unreliable and
+  # slightly grubby if the recipient notices it.
   open_tracking: false
-  base_url: ""                    # e.g. https://link.yourdomain.com
+  base_url: ""
 
 
 paths:
@@ -54,47 +82,37 @@ paths:
 
 
 # ---------------------------------------------------------------------------
-# Mailboxes. One entry per sending inbox.
+# One mailbox: your own Gmail.
 #
-# Use secondary domains only - never the domain you run your real business
-# email on. If a sending domain gets burned, you throw it away; you cannot
-# throw away your primary domain.
+# No secondary domains, no Google Workspace, no SPF/DKIM/DMARC to configure -
+# Google already handles authentication for gmail.com, and your account has
+# real sending history, which is worth more than any new domain could be.
 #
-# For Google Workspace: enable 2FA on the account, then create an App Password
-# (myaccount.google.com > Security > App passwords) and export it:
-#   export MB1_PASSWORD='abcd efgh ijkl mnop'
+# Generate an App Password: myaccount.google.com > Security > 2-Step
+# Verification > App passwords. Requires 2FA to be on. Then:
+#   $env:MB1_PASSWORD = "abcd efgh ijkl mnop"
 # ---------------------------------------------------------------------------
 mailboxes:
-  - id: mb1
-    email: "shivanshu@get-yourcompany.com"
+  - id: personal
+    email: "shivanshup1@gmail.com"
     from_name: "Shivanshu Pandey"
-    username: "shivanshu@get-yourcompany.com"
+    username: "shivanshup1@gmail.com"
     password_env: MB1_PASSWORD
     smtp_host: smtp.gmail.com
     smtp_port: 587
     imap_host: imap.gmail.com
     imap_port: 993
-    daily_cap: 40
+    daily_cap: 20
     enabled: true
-    # first_send_date: "2026-08-10"   # optional; set automatically on first send
 
-  - id: mb2
-    email: "shivanshu@try-yourcompany.com"
-    from_name: "Shivanshu Pandey"
-    username: "shivanshu@try-yourcompany.com"
-    password_env: MB2_PASSWORD
-    smtp_host: smtp.gmail.com
-    smtp_port: 587
-    imap_host: imap.gmail.com
-    imap_port: 993
-    daily_cap: 40
-    enabled: false                # flip on once this domain is warmed
 
-  # Microsoft 365 looks like this instead:
-  # - id: mb3
-  #   email: "you@get-yourcompany.com"
-  #   password_env: MB3_PASSWORD
-  #   smtp_host: smtp.office365.com
-  #   smtp_port: 587
-  #   imap_host: outlook.office365.com
-  #   imap_port: 993
+# ---------------------------------------------------------------------------
+# If you ever use this for commercial marketing instead, three things change:
+#
+#   identity.footer: full          + physical_address + unsubscribe_mailto
+#   mailboxes:                     secondary domains, never your primary
+#   warmup.max_cap:                still 40 max per mailbox; scale by adding
+#                                  mailboxes, not by raising the cap
+#
+# See README.md. Different rules, different risk.
+# ---------------------------------------------------------------------------

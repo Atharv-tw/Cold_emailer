@@ -1,8 +1,12 @@
 name: founders
 description: >
-  Four-touch sequence. Steps 2-4 reply into the original thread, which is why
-  they have no subject line. Keep every email short enough to read on a phone
-  without scrolling - that is the single biggest lever on reply rate.
+  To founders and CTOs at small startups. One person decides, so you get a
+  fast yes or no. Many have no formal internship program at all, which works
+  in your favour - you are not competing against a queue of 4,000 portal
+  applications, you are proposing something that did not exist.
+
+  Lead with what you can do for them, not what you want. Three touches,
+  because founders genuinely do lose emails.
 
 stop_on_reply: true
 
@@ -10,56 +14,42 @@ steps:
   # ---------------------------------------------------------------- touch 1
   - id: 1
     delay_business_days: 0
-    subject: "{{first_name}} - quick question about {{company}}"
+    subject: "{{focus}} intern for {{company}} — {{availability_short|free from May}}"
     body: |
       Hi {{first_name}},
 
-      {saw|noticed} that {{company}} {{trigger|has been growing quickly}}.
+      I'm {{my_name}}, {{my_status}} at {{university}}. {{specific}} — {{reaction|which is why I'm writing}}.
 
-      We help {{segment|ops teams}} at similar companies cut the manual work
-      out of {{pain|reconciling data across tools}} - typically {{result|around
-      6 hours a week per person}}.
+      What I've built: {{my_project}}, where I {{my_project_detail}}.
 
-      Worth a 15-minute call to see if it maps to how you work?
+      I'm looking for a {{season}} {{year}} internship, and I'd rather work on whatever's actually blocking you than a curated side project. {{availability}}.
 
-      {{sender_first|Shivanshu}}
+      {{resume_url}}
+
+      Worth 15 minutes?
+
+      {{my_first_name}}
 
   # ---------------------------------------------------------------- touch 2
   - id: 2
-    delay_business_days: 3
-    body: |
-      Hi {{first_name}},
-
-      Following up on the note below.
-
-      One specific thing: {{proof|a team of the same size cut their weekly
-      close from two days to four hours}}. Happy to walk through exactly how,
-      or send the write-up if that's easier.
-
-      {{sender_first|Shivanshu}}
-
-  # ---------------------------------------------------------------- touch 3
-  - id: 3
     delay_business_days: 5
     body: |
       Hi {{first_name}},
 
-      Guessing this isn't a priority right now, which is fair.
+      Following up on the below.
 
-      If it's someone else at {{company}} who owns {{pain|this}}, point me at
-      them and I'll take it from here.
+      To make it concrete: give me {{concrete_offer|two weeks}} and I'd {{concrete_deliverable|ship a working prototype of whatever's furthest down your backlog}}. Happy to do a paid trial task first so you're not taking my word for it.
 
-      {{sender_first|Shivanshu}}
+      {{my_first_name}}
 
-  # ---------------------------------------------------------------- touch 4
-  - id: 4
-    delay_business_days: 7
+  # ---------------------------------------------------------------- touch 3
+  - id: 3
+    delay_business_days: 8
     body: |
       Hi {{first_name}},
 
-      Last one from me - I'll close the file.
+      Last one from me — I'll stop after this.
 
-      If {{pain|the manual reconciliation}} becomes worth solving later,
-      reply to this thread and I'll pick it straight back up.
+      If the timing's wrong now but might not be later, say so and I'll check back in a few months rather than keep emailing.
 
-      {{sender_first|Shivanshu}}
+      {{my_first_name}}

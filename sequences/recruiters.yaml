@@ -1,0 +1,47 @@
+name: recruiters
+description: >
+  To recruiters and university talent teams.
+
+  Set expectations low. Recruiters get enormous inbound and most will redirect
+  you to the careers portal regardless of what you write - reply rates here
+  are a fraction of what you'll see from engineers. Worth running because it
+  is cheap, not because it converts.
+
+  What does work: being concrete and scannable. No story, no enthusiasm
+  paragraph. Role, dates, one credential, link, done. Two touches.
+
+stop_on_reply: true
+
+steps:
+  # ---------------------------------------------------------------- touch 1
+  - id: 1
+    delay_business_days: 0
+    subject: "{{season_title|Summer}} {{year}} {{focus}} internship — {{my_name}}"
+    body: |
+      Hi {{first_name}},
+
+      I'm {{my_status}} at {{university}}, applying for {{season}} {{year}} {{focus}} internships at {{company}}.
+
+      Short version:
+
+      - {{my_project}} — {{my_project_detail}}
+      - {{credential|relevant coursework in ML, plus two shipped side projects}}
+      - {{availability}}
+
+      Resume: {{resume_url}}
+
+      Is the {{season}} {{year}} cycle open, and should I apply through the portal or is there a better route?
+
+      {{my_first_name}}
+
+  # ---------------------------------------------------------------- touch 2
+  - id: 2
+    delay_business_days: 7
+    body: |
+      Hi {{first_name}},
+
+      Quick follow-up on the below.
+
+      If applications aren't open yet, I'm happy to check back when they are — just let me know roughly when.
+
+      {{my_first_name}}

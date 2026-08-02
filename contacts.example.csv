@@ -1,4 +1,4 @@
-email,first_name,last_name,company,title,trigger,pain,segment,proof,result,sender_first
-dana@examplecorp.com,Dana,Okafor,ExampleCorp,Head of Operations,just opened a second warehouse,reconciling stock counts across three systems,ops teams,a 40-person 3PL cut their stock count from two days to four hours,about 6 hours a week per person,Shivanshu
-raj@northwind.io,Raj,Mehta,Northwind,VP Finance,closed a Series A in May,pulling month-end numbers out of four tools,finance teams,a Series A fintech cut their close from 9 days to 3,roughly a week of analyst time each month,Shivanshu
-lena@brightpath.co,Lena,Fischer,Brightpath,COO,doubled headcount this year,onboarding new hires across six SaaS tools,operations leads,a 120-person agency got onboarding down to a single afternoon,about 4 hours per new hire,Shivanshu
+email,first_name,last_name,company,specific,specific_short,reaction
+priya.raman@exampleai.com,Priya,Raman,ExampleAI,your post on serving quantised models at 4-bit without losing accuracy,4-bit serving at ExampleAI,I tried reproducing the benchmark and got within 2 points
+tom@northwind.io,Tom,Alvarez,Northwind,Northwind shipping semantic search for internal docs last month,Northwind's semantic search,it's the same problem I've been stuck on from the retrieval side
+sara.chen@brightpath.co,Sara,Chen,Brightpath,your talk at PyData on evaluation harnesses,your PyData talk on eval harnesses,the point about leaking eval sets into training data landed hard
