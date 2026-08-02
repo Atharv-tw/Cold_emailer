@@ -1,57 +1,79 @@
 # Copy to config.yaml and edit. config.yaml is gitignored.
 # Passwords are NEVER stored here - only the name of an environment variable.
 #
-# This example is set up for personal outreach from a single Gmail account:
-# internship and research enquiries, not marketing. See the bottom of the file
-# for what changes if you ever use this for commercial email.
+# Set up for personal outreach from a single Gmail account: internship
+# enquiries, not marketing. See README.md for what changes if you ever point
+# this at commercial email.
 
 identity:
-  from_name: "Shivanshu Pandey"
+  from_name: "Atharv Tiwari"
   company: ""
 
-  # No compliance footer. This is person-to-person mail - a job enquiry is not
-  # advertising a product, so CAN-SPAM's address and opt-out requirements do
-  # not apply, and bolting them onto a personal note makes it read as a mass
-  # mailing. Set this to "full" only if you switch to marketing email.
+  # No compliance footer. This is person-to-person mail - an internship
+  # enquiry is not advertising a product, so CAN-SPAM's address and opt-out
+  # requirements do not apply, and bolting them onto a personal note makes it
+  # read as a mass mailing. Set to "full" only for marketing email.
   footer: none
 
   # Merge fields available in every template, so you don't repeat them in
   # every CSV row. A CSV column with the same name overrides these.
   vars:
-    my_name: "Shivanshu Pandey"
-    my_first_name: "Shivanshu"
-    my_status: "a third-year CS undergrad"
-    university: "Your University"
+    my_name: "Atharv Tiwari"
+    my_first_name: "Atharv"
 
-    # Host the resume somewhere with a stable link. A link beats an attachment:
-    # attachments from unknown senders get filtered more often.
-    resume_url: "https://yoursite.com/resume.pdf"
-    portfolio: "https://github.com/yourhandle"
+    # CHECK THIS. Resume said 2nd-year as of mid-2026; B.Tech runs 2024-2028,
+    # so you are starting year three now. Change if that's wrong.
+    my_status: "a third-year CSE undergrad"
+    university: "GGSIPU, Delhi"
 
+    # REPLACE BOTH. Host the resume somewhere with a stable link - GitHub
+    # Pages, a personal domain, or Drive set to "anyone with the link". A link
+    # beats an attachment: attachments from unknown senders get filtered more
+    # often, and a Drive link tells you if anyone actually opened it.
+    resume_url: "PUT-YOUR-RESUME-LINK-HERE"
+    portfolio: "https://github.com/Atharv-tw"
+    linkedin: "https://linkedin.com/in/atharvtw"
+
+    # CHECK THESE. Assumed you're targeting next summer.
     season: "summer"
     year: "2027"
-    availability: "free from May, full-time, can relocate"
-    focus: "ML"
+    availability: "free from May, full-time, based in Delhi and can relocate"
 
-    # Your strongest project. Keep it concrete and quantified - this is the
-    # single line doing the most work in the whole email.
-    my_project: "a retrieval pipeline for 400k support tickets"
+    # What you want to be hired to do. This lands in subject lines, so keep it
+    # short and recognisable to the reader.
+    focus: "AI engineering"
+
+    # Your strongest project. Onyx has the hardest numbers on your resume,
+    # which is why it's here rather than HealthVault or Finstar. Swap per
+    # campaign if a different one fits the company better - a fintech should
+    # probably hear about Finstar instead.
+    my_project: "Onyx, an AI-powered DAST platform"
     my_project_detail: >-
-      fine-tuned a small embedding model that beat off-the-shelf ada-002 by
-      11 points on recall@10
+      built the scanning engine over Subfinder, Nmap and Nuclei, then an LLM
+      triage layer that dedupes raw scanner output at 90%+ accuracy and opens
+      remediation PRs automatically - cut mean time to repair by around 70%
+
+    # Used by the recruiters sequence. One line, strongest signal first.
+    credential: >-
+      CTO at Nexera, winner of IEEE T-Hacks 8.0 (2nd of 200+ teams), and
+      production systems shipped across healthcare, civic and fintech
 
 
 sending:
   timezone: "Asia/Kolkata"
 
-  # Set this to your TARGET's working hours, not yours. For US companies from
-  # India that means late evening IST; for UK, early evening.
+  # This window is in YOUR timezone but should land in your TARGET's morning,
+  # which is when replies happen. Currently set for Indian companies.
+  #
+  #   India        09:15 - 12:00
+  #   UK / Europe  13:30 - 16:30
+  #   US East      18:30 - 21:30
+  #   US West      21:30 - 23:45
+  #
+  # Pick one region per campaign rather than covering all of them.
   window_start: "09:15"
-  window_end: "17:30"
+  window_end: "12:00"
   days: [mon, tue, wed, thu, fri]
-
-  # Tue-Thu mornings get the best response. Avoid Monday morning and Friday
-  # afternoon by trimming `days` if you want to be strict about it.
 
   min_gap_seconds: 300
   max_gap_seconds: 1500
@@ -60,7 +82,7 @@ sending:
 
 warmup:
   # Your Gmail is already warm - years of real use - so this is not about
-  # reputation. It is a blast radius limit: if your copy has a mistake in it,
+  # reputation. It is a blast radius limit: if the copy has a mistake in it,
   # you find out after 8 emails, not 200.
   enabled: true
   start_cap: 8
@@ -69,8 +91,8 @@ warmup:
 
 
 tracking:
-  # Leave off. On personal outreach a tracking pixel is both unreliable and
-  # slightly grubby if the recipient notices it.
+  # Leave off. On personal outreach a tracking pixel is unreliable and looks
+  # bad if the recipient notices it.
   open_tracking: false
   base_url: ""
 
@@ -89,14 +111,14 @@ paths:
 # real sending history, which is worth more than any new domain could be.
 #
 # Generate an App Password: myaccount.google.com > Security > 2-Step
-# Verification > App passwords. Requires 2FA to be on. Then:
+# Verification > App passwords. Requires 2FA. Then:
 #   $env:MB1_PASSWORD = "abcd efgh ijkl mnop"
 # ---------------------------------------------------------------------------
 mailboxes:
   - id: personal
-    email: "shivanshup1@gmail.com"
-    from_name: "Shivanshu Pandey"
-    username: "shivanshup1@gmail.com"
+    email: "tiwariatharv01042005@gmail.com"
+    from_name: "Atharv Tiwari"
+    username: "tiwariatharv01042005@gmail.com"
     password_env: MB1_PASSWORD
     smtp_host: smtp.gmail.com
     smtp_port: 587
