@@ -1,0 +1,12 @@
+# Normalise line endings so the repo doesn't churn between Windows and Linux.
+# Everything is stored as LF; Python, YAML and Markdown all handle LF on Windows.
+* text=auto eol=lf
+
+# PowerShell is happier with CRLF on disk.
+*.ps1 text eol=crlf
+
+# Never touch these.
+*.pdf  binary
+*.png  binary
+*.jpg  binary
+*.db   binary
