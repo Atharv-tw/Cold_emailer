@@ -1,0 +1,100 @@
+# Copy to config.yaml and edit. config.yaml is gitignored.
+# Passwords are NEVER stored here - only the name of an environment variable.
+
+identity:
+  from_name: "Shivanshu Pandey"
+  company: "Your Company Ltd"
+
+  # Legally required by CAN-SPAM on every commercial email. A registered
+  # office or a mailbox service is fine; it has to be a real postal address.
+  physical_address: "221B Example Street, Bengaluru 560001, India"
+
+  # Must be a mailbox you actually read and act on.
+  unsubscribe_mailto: "unsubscribe@yourdomain.com"
+
+  unsubscribe_line: "Not the right person? Reply 'unsubscribe' and I'll stop."
+
+
+sending:
+  timezone: "Asia/Kolkata"        # window times below are in this timezone
+  window_start: "09:15"           # deliberately not on the hour - looks human
+  window_end: "17:30"
+  days: [mon, tue, wed, thu, fri]
+
+  # Randomised gap between two sends from the SAME mailbox. Never set these
+  # low enough to produce a machine-gun pattern; 3-15 minutes reads as human.
+  min_gap_seconds: 210
+  max_gap_seconds: 900
+
+  max_per_tick: 5                 # ceiling per `run` pass, across all mailboxes
+
+
+warmup:
+  # Daily cap per mailbox, ramping from start_cap on its first send date.
+  # Google's hard limit is 2,000/day but cold volume anywhere near that
+  # destroys deliverability. These numbers are the ones that actually work.
+  enabled: true
+  start_cap: 10
+  increment_per_day: 3
+  max_cap: 40                     # never exceed ~40-50/mailbox for cold mail
+
+
+tracking:
+  # Off by default. Pixels are unreliable (Apple MPP and Gmail's proxy
+  # pre-fetch them) and add a small deliverability penalty. Replies are the
+  # real metric. Turn on only if you host coldmailer.tracker behind HTTPS.
+  open_tracking: false
+  base_url: ""                    # e.g. https://link.yourdomain.com
+
+
+paths:
+  db: coldmailer.db
+  sequences: sequences
+  suppression: suppression.txt
+
+
+# ---------------------------------------------------------------------------
+# Mailboxes. One entry per sending inbox.
+#
+# Use secondary domains only - never the domain you run your real business
+# email on. If a sending domain gets burned, you throw it away; you cannot
+# throw away your primary domain.
+#
+# For Google Workspace: enable 2FA on the account, then create an App Password
+# (myaccount.google.com > Security > App passwords) and export it:
+#   export MB1_PASSWORD='abcd efgh ijkl mnop'
+# ---------------------------------------------------------------------------
+mailboxes:
+  - id: mb1
+    email: "shivanshu@get-yourcompany.com"
+    from_name: "Shivanshu Pandey"
+    username: "shivanshu@get-yourcompany.com"
+    password_env: MB1_PASSWORD
+    smtp_host: smtp.gmail.com
+    smtp_port: 587
+    imap_host: imap.gmail.com
+    imap_port: 993
+    daily_cap: 40
+    enabled: true
+    # first_send_date: "2026-08-10"   # optional; set automatically on first send
+
+  - id: mb2
+    email: "shivanshu@try-yourcompany.com"
+    from_name: "Shivanshu Pandey"
+    username: "shivanshu@try-yourcompany.com"
+    password_env: MB2_PASSWORD
+    smtp_host: smtp.gmail.com
+    smtp_port: 587
+    imap_host: imap.gmail.com
+    imap_port: 993
+    daily_cap: 40
+    enabled: false                # flip on once this domain is warmed
+
+  # Microsoft 365 looks like this instead:
+  # - id: mb3
+  #   email: "you@get-yourcompany.com"
+  #   password_env: MB3_PASSWORD
+  #   smtp_host: smtp.office365.com
+  #   smtp_port: 587
+  #   imap_host: outlook.office365.com
+  #   imap_port: 993

@@ -1,0 +1,65 @@
+name: founders
+description: >
+  Four-touch sequence. Steps 2-4 reply into the original thread, which is why
+  they have no subject line. Keep every email short enough to read on a phone
+  without scrolling - that is the single biggest lever on reply rate.
+
+stop_on_reply: true
+
+steps:
+  # ---------------------------------------------------------------- touch 1
+  - id: 1
+    delay_business_days: 0
+    subject: "{{first_name}} - quick question about {{company}}"
+    body: |
+      Hi {{first_name}},
+
+      {saw|noticed} that {{company}} {{trigger|has been growing quickly}}.
+
+      We help {{segment|ops teams}} at similar companies cut the manual work
+      out of {{pain|reconciling data across tools}} - typically {{result|around
+      6 hours a week per person}}.
+
+      Worth a 15-minute call to see if it maps to how you work?
+
+      {{sender_first|Shivanshu}}
+
+  # ---------------------------------------------------------------- touch 2
+  - id: 2
+    delay_business_days: 3
+    body: |
+      Hi {{first_name}},
+
+      Following up on the note below.
+
+      One specific thing: {{proof|a team of the same size cut their weekly
+      close from two days to four hours}}. Happy to walk through exactly how,
+      or send the write-up if that's easier.
+
+      {{sender_first|Shivanshu}}
+
+  # ---------------------------------------------------------------- touch 3
+  - id: 3
+    delay_business_days: 5
+    body: |
+      Hi {{first_name}},
+
+      Guessing this isn't a priority right now, which is fair.
+
+      If it's someone else at {{company}} who owns {{pain|this}}, point me at
+      them and I'll take it from here.
+
+      {{sender_first|Shivanshu}}
+
+  # ---------------------------------------------------------------- touch 4
+  - id: 4
+    delay_business_days: 7
+    body: |
+      Hi {{first_name}},
+
+      Last one from me - I'll close the file.
+
+      If {{pain|the manual reconciliation}} becomes worth solving later,
+      reply to this thread and I'll pick it straight back up.
+
+      {{sender_first|Shivanshu}}
