@@ -269,11 +269,25 @@ def load_config(path: str | Path, *, require_passwords: bool = True) -> Config:
     )
 
     sending_raw = raw.get("sending") or {}
+    tz_name = sending_raw.get("timezone", "UTC")
     try:
-        tz_name = sending_raw.get("timezone", "UTC")
         ZoneInfo(tz_name)
     except ZoneInfoNotFoundError as exc:
-        raise ConfigError(f"Unknown timezone {tz_name!r}") from exc
+        # Windows ships no IANA timezone database, so every name looks unknown
+        # until the tzdata package is installed. Distinguish that from a typo.
+        try:
+            import tzdata  # noqa: F401
+        except ImportError:
+            raise ConfigError(
+                f"Cannot resolve timezone {tz_name!r} - no timezone database is "
+                f"installed.\n\nWindows does not ship one, so Python needs the "
+                f"tzdata package:\n\n    pip install tzdata\n\n"
+                f"(or re-run: pip install -r requirements.txt)"
+            ) from exc
+        raise ConfigError(
+            f"Unknown timezone {tz_name!r}. Use an IANA name such as "
+            f"Asia/Kolkata, Europe/London or America/New_York."
+        ) from exc
 
     days = [str(d).lower()[:3] for d in sending_raw.get("days", ["mon", "tue", "wed", "thu", "fri"])]
     bad_days = [d for d in days if d not in DAY_NAMES]

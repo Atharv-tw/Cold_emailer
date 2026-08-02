@@ -303,6 +303,44 @@ class TestConfig(Base):
             load_config(path)
         self.assertIn("password_env", str(ctx.exception))
 
+    def test_unknown_timezone_reports_a_typo(self):
+        path = self.root / "tz.yaml"
+        path.write_text(
+            CONFIG_YAML.replace('timezone: "Asia/Kolkata"', 'timezone: "Asia/Delhi"'),
+            encoding="utf-8",
+        )
+        with self.assertRaises(ConfigError) as ctx:
+            load_config(path)
+        self.assertIn("Unknown timezone", str(ctx.exception))
+
+    def test_missing_tzdata_says_how_to_fix_it(self):
+        """Windows ships no IANA database - the error must not look like a typo."""
+        import builtins
+        import zoneinfo
+        from unittest import mock
+
+        from coldmailer import config as config_module
+
+        real_import = builtins.__import__
+
+        def no_tzdata(name, *args, **kwargs):
+            if name == "tzdata":
+                raise ImportError("No module named 'tzdata'")
+            return real_import(name, *args, **kwargs)
+
+        def missing(name):
+            raise zoneinfo.ZoneInfoNotFoundError(name)
+
+        with mock.patch.object(config_module, "ZoneInfo", missing):
+            builtins.__import__ = no_tzdata
+            try:
+                with self.assertRaises(ConfigError) as ctx:
+                    load_config(self.root / "config.yaml")
+            finally:
+                builtins.__import__ = real_import
+
+        self.assertIn("pip install tzdata", str(ctx.exception))
+
     def test_sending_window_check(self):
         inside = datetime(2026, 8, 3, 10, 0, tzinfo=IST)
         after_hours = datetime(2026, 8, 3, 22, 0, tzinfo=IST)
