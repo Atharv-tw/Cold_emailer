@@ -25,7 +25,9 @@ from coldmailer.scheduler import (  # noqa: E402
 )
 from coldmailer.sequences import SequenceError, load_all, load_sequence  # noqa: E402
 from coldmailer.store import Store, utcnow  # noqa: E402
-from coldmailer.templating import expand_spintax, lint, render, render_step  # noqa: E402
+from coldmailer.templating import (  # noqa: E402
+    contact_fields, expand_spintax, lint, render, render_step,
+)
 
 IST = ZoneInfo("Asia/Kolkata")
 
@@ -182,6 +184,69 @@ class TestTemplating(Base):
             thread_subject="Hi Dana - about ExampleCorp",
         )
         self.assertEqual(rendered.subject, "Re: Hi Dana - about ExampleCorp")
+
+    def test_footer_none_appends_nothing(self):
+        path = self.root / "personal.yaml"
+        path.write_text(
+            CONFIG_YAML.replace(
+                'from_name: "Test Sender"',
+                'from_name: "Test Sender"\n  footer: none',
+            ),
+            encoding="utf-8",
+        )
+        cfg = load_config(path)
+        rendered = render_step(
+            {"id": 1, "subject": "Hi", "body": "Body text"},
+            {"email": "d@e.com", "first_name": "Dana", "custom": "{}", "unsub_token": "t"},
+            cfg.identity,
+        )
+        self.assertEqual(rendered.body, "Body text")
+        self.assertNotIn("unsubscribe", rendered.body.lower())
+
+    def test_personal_mail_omits_list_unsubscribe_header(self):
+        path = self.root / "personal2.yaml"
+        path.write_text(
+            CONFIG_YAML.replace(
+                'from_name: "Test Sender"',
+                'from_name: "Test Sender"\n  footer: none',
+            ),
+            encoding="utf-8",
+        )
+        cfg = load_config(path)
+        msg = sender.build_message(
+            cfg, cfg.mailboxes[0],
+            sender.Outgoing(to_email="d@e.com", subject="Hi", body="Body"),
+        )
+        self.assertIsNone(msg.get("List-Unsubscribe"))
+
+    def test_config_vars_fill_templates(self):
+        path = self.root / "vars.yaml"
+        path.write_text(
+            CONFIG_YAML.replace(
+                'from_name: "Test Sender"',
+                'from_name: "Test Sender"\n  vars:\n    resume_url: "https://me.dev/cv.pdf"',
+            ),
+            encoding="utf-8",
+        )
+        cfg = load_config(path)
+        rendered = render_step(
+            {"id": 1, "subject": "Hi", "body": "CV: {{resume_url}}"},
+            {"email": "d@e.com", "first_name": "Dana", "custom": "{}", "unsub_token": "t"},
+            cfg.identity,
+        )
+        self.assertIn("https://me.dev/cv.pdf", rendered.body)
+        self.assertTrue(rendered.ok)
+
+    def test_csv_column_overrides_config_var(self):
+        fields = contact_fields(
+            {"email": "d@e.com", "custom": '{"focus": "computer vision"}'},
+            {"focus": "ML"},
+        )
+        self.assertEqual(fields["focus"], "computer vision")
+
+    def test_tech_acronyms_do_not_trip_the_caps_check(self):
+        self.assertEqual(lint("I fine-tuned BERT with CUDA and PyTorch."), [])
+        self.assertIn("ALL-CAPS", " ".join(lint("THIS IS URGENT")))
 
     def test_lint_flags_spam_triggers_and_links(self):
         warnings = lint("ACT NOW click here https://a.com https://b.com FREE!!")
