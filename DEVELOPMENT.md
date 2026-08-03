@@ -109,8 +109,16 @@ that protect stored refresh tokens are actually configured.
 
 One OAuth client (Web application), used by both apps. The consent screen stays
 in **testing** mode: up to 100 users, no CASA review, and `gmail.readonly`
-works from day one. Users see an "unverified app" warning; onboarding says so
-before they hit it.
+works from day one.
+
+**Every account that signs in must be added by hand** under *APIs & Services →
+OAuth consent screen → Audience → Test users*. This is not the soft
+"unverified app" warning — an account that is not on the list gets
+`Error 403: access_denied` and cannot proceed at all. Adding it takes effect
+immediately. That list is what the 100-user cap actually counts.
+
+Approved testers still see the "unverified app" warning, which is expected and
+which onboarding explains before they hit it.
 
 Scopes: `openid email profile`, `gmail.send`, `gmail.readonly`.
 

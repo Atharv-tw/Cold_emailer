@@ -32,6 +32,14 @@ export default async function Home() {
       </div>
 
       <div className="note">
+        Getting <strong>&ldquo;Access blocked&rdquo;</strong> or{" "}
+        <code>Error 403: access_denied</code> instead? That account has not been
+        added as a tester yet, which is a separate list from the warning above.
+        Ask for an invite rather than retrying — nothing you do on this screen
+        will change it.
+      </div>
+
+      <div className="note">
         Reading your inbox is what stops the tool emailing someone who already
         replied. It only ever looks at threads it started.
       </div>
