@@ -75,8 +75,19 @@ guard.
 
 Then:
 
+Activate the venv first, or every command below picks up whatever `python` is
+on PATH — usually a system install without these dependencies:
+
 ```bash
-pip install -e packages/core -e apps/api
+.venv/Scripts/Activate.ps1
+```
+
+```bash
+pip install -e packages/core
+```
+
+```bash
+pip install -e apps/api
 ```
 
 ```bash
