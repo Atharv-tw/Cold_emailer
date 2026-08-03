@@ -9,7 +9,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .db import engine
-from .routers import auth, health, profile, resumes
+from .routers import (
+    auth, dashboard, drafts, gmail_push, health, profile, resumes, send, targets,
+)
 from .settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -54,3 +56,8 @@ app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(profile.router)
 app.include_router(resumes.router)
+app.include_router(targets.router)
+app.include_router(drafts.router)
+app.include_router(send.router)
+app.include_router(dashboard.router)
+app.include_router(gmail_push.router)
