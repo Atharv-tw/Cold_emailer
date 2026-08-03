@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "outreach-core"
+version = "0.1.0"
+description = "Provider-agnostic deliverability logic: scheduling, limits, threading, classification."
+requires-python = ">=3.10"
+
+# Deliberately no runtime dependencies. This package is the regression net for
+# the rewrite, and it stays runnable with nothing installed.
+dependencies = []
+
+[project.optional-dependencies]
+# Windows ships no IANA timezone database, so zoneinfo cannot resolve names
+# like Asia/Kolkata without this. Unused on Linux and macOS.
+windows = ["tzdata>=2024.1"]
+
+[tool.setuptools.packages.find]
+include = ["outreach_core*"]
