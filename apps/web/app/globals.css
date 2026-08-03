@@ -5,6 +5,7 @@
   --muted: #5c5c66;
   --line: #e4e4e9;
   --accent: #1a5fd0;
+  --danger: #b4232b;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -14,6 +15,7 @@
     --muted: #9a9aa6;
     --line: #26262e;
     --accent: #6fa2ff;
+    --danger: #ff8a8a;
   }
 }
 
@@ -55,10 +57,110 @@ button {
   cursor: pointer;
 }
 
+button.quiet {
+  background: transparent;
+  color: var(--fg);
+}
+
+button.danger {
+  background: transparent;
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .note {
   border: 1px solid var(--line);
   border-radius: 0.5rem;
   padding: 0.9rem 1rem;
   margin: 1.5rem 0;
+  font-size: 0.9rem;
+}
+
+.note ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+h2 {
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+input[type="text"],
+input:not([type]),
+textarea {
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+  padding: 0.5rem 0.6rem;
+}
+
+fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.9rem 1rem;
+}
+
+legend {
+  font-size: 0.85rem;
+  color: var(--muted);
+  padding: 0 0.3rem;
+}
+
+/* Marks a value a model pulled out of a resume. It stays until the user
+   edits the field, because until then nobody has checked it. */
+.badge {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.6rem;
+  color: var(--accent);
+  font-size: 0.72rem;
+  letter-spacing: 0.01em;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.ok {
+  color: var(--accent);
+  font-size: 0.9rem;
+}
+
+.error {
+  color: var(--danger);
   font-size: 0.9rem;
 }
