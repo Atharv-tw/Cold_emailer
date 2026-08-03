@@ -64,7 +64,11 @@ class Settings(BaseSettings):
     )
 
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash"
+    # 3.6 Flash went GA on 2026-07-21. `generateContent` is explicitly still
+    # fully supported for it - the newer Interactions API is recommended for
+    # new projects but is not a requirement, and moving to it would change the
+    # request shape rather than just the model string.
+    gemini_model: str = "gemini-3.6-flash"
     gemini_endpoint: str = "https://generativelanguage.googleapis.com/v1beta"
 
     # projects/<project>/topics/<topic>. The Gmail service account must have

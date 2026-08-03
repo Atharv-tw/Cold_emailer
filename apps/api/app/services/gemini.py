@@ -233,6 +233,25 @@ def _error_message(response: httpx.Response) -> str:
         return f"Gemini rejected the API key ({response.status_code}): {message}"
     if response.status_code == 429:
         return "Gemini rate limit or quota exhausted - try again shortly."
+
+    # Google is moving generation to the Interactions API, where structured
+    # output is `response_format` and the sampling parameters have been
+    # deprecated. `generateContent` is documented as still fully supported,
+    # but if a future model rejects a field we send, the raw 400 says
+    # "Invalid JSON payload" and nothing about what to do. Name it instead.
+    lowered = message.lower()
+    if response.status_code == 400 and any(
+        field in lowered
+        for field in ("generationconfig", "responseschema", "responsemimetype", "temperature")
+    ):
+        return (
+            f"Gemini rejected the request shape ({message}). This usually means "
+            f"the model no longer accepts a generationConfig field on "
+            f"generateContent. Either pin GEMINI_MODEL to a model that does, or "
+            f"port this client to the Interactions API, where structured output "
+            f"is `response_format` rather than responseSchema."
+        )
+
     return f"Gemini returned {response.status_code}: {message}"
 
 
