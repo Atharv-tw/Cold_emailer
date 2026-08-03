@@ -24,6 +24,7 @@ node_modules/
 .next/
 .env.local
 next-env.d.ts
+*.tsbuildinfo
 
 # Uploaded resumes and other local object storage. Personal data - the same
 # reason contact lists are excluded above.
