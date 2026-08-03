@@ -122,6 +122,68 @@ to bind to. Rather than a `BYPASSRLS` role - which would exempt every query on
 that connection - there is one `SECURITY DEFINER` function,
 `find_user_id_by_google_sub`, that returns an id and nothing else.
 
+## The worker
+
+The API alone does not send anything. `app.worker` holds four jobs:
+
+| job | cadence | why it exists |
+|---|---|---|
+| `tick` | every 2 min | sends what is due |
+| `renew_watches` | daily | Gmail's `watch` expires in ~7 days and then stops delivering **silently** — no error, no callback. Nothing tells us when it lapses, so it is re-armed every day regardless. |
+| `reconcile` | 4×/day | reads threads directly for anything push missed. Slow, so it runs rarely; it is what makes a broken push pipeline survivable rather than dangerous. |
+| `notify_due` | daily | web push for follow-ups coming due |
+
+```bash
+cd apps/api && arq app.worker.WorkerSettings
+```
+
+This is why the API needs a long-running host rather than a serverless one.
+
+## Gmail push
+
+1. Create a Pub/Sub topic.
+2. Grant `gmail-api-push@system.gserviceaccount.com` the **Publisher** role on
+   it. Without this, `users.watch` fails with a permission error that reads as
+   though the scope is wrong.
+3. Create a push subscription pointing at
+   `<API_BASE_URL>/v1/gmail/push?token=<PUBSUB_VERIFICATION_TOKEN>`.
+
+The token is not decoration. Google posts to that endpoint, not a signed-in
+user, so without it the route is an open POST anyone could use to make this
+service hammer Gmail.
+
+Reply detection is thread-based: any message in the target's thread not
+authored by the user is inbound. That is more reliable than matching
+Message-IDs, which clients drop and rewrite.
+
+## Address verification
+
+QuickEmailVerification. Syntax and MX are checked first so obvious typos never
+cost a credit, and the free tier's 100 checks a day is far more than this
+product's own caps let anyone send.
+
+Four states, and the mapping is deliberate:
+
+- `undeliverable` blocks sending
+- `risky` warns and lets the user proceed — a catch-all domain lands here,
+  because "valid" there only means the server did not say no
+- `unknown` gets out of the way
+- **every one of our own failures maps to `unknown`** — timeout, no credits,
+  rate limit, bad key. A vendor outage is not evidence about somebody's
+  address, and blocking a send on it would be inventing a fact.
+
+## The PWA
+
+`app/manifest.ts` plus `public/sw.js`. No separate build, no store.
+
+The service worker caches nothing on purpose: a cold-outreach dashboard
+showing stale state is worse than one that fails to load, because the entire
+product depends on "have they replied yet" being current.
+
+Web push is a convenience. The dashboard's "due today" list is the mechanism,
+and it works for everyone who denied notifications, revoked them, or is on a
+platform that silently drops them.
+
 ## Tests
 
 ```bash
@@ -131,3 +193,13 @@ python -m unittest discover -s packages/core/tests
 ```bash
 python -m unittest discover -s apps/api/tests
 ```
+
+190 tests, no network and no database. The Gmail transport, Gemini and the
+verifier are all driven through injected `httpx` transports against real
+response shapes.
+
+Not covered by these: anything that needs Postgres. `send_one` runs every
+limit check in sequence against live rows, and the end-to-end proof of it is
+the manual run in the plan — a throwaway Google account, a target pointing at
+a second address you own, reply from it, confirm the sequence stops; then
+repeat with an out-of-office and confirm it **defers instead of stopping**.
