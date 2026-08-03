@@ -11,11 +11,23 @@ env.ps1
 *.db-shm
 run.log
 
-# Contact lists are personal data - keep them out of version control
-contacts*.csv
-leads*.csv
-*-list.csv
+# Contact lists are personal data - keep them out of version control.
+# Deny every spreadsheet by default and allow the examples back in, rather than
+# naming patterns: a file called alfonso.csv is just as personal as leads.csv.
+*.csv
+*.xlsx
+*.xls
 !contacts.example.csv
+
+# Web app
+node_modules/
+.next/
+.env.local
+next-env.d.ts
+
+# Uploaded resumes and other local object storage. Personal data - the same
+# reason contact lists are excluded above.
+var/
 
 # Python
 __pycache__/
