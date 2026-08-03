@@ -9,9 +9,9 @@ changing is not a limit.
 from __future__ import annotations
 
 from datetime import time
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from outreach_core.scheduling import DAY_NAMES, ScheduleError, SendingWindow
 
@@ -129,6 +129,68 @@ class ParsedResumeOut(BaseModel):
     links: dict[str, str] = Field(default_factory=dict)
     projects: list[ProjectIn] = Field(default_factory=list)
     experience: list[ExperienceIn] = Field(default_factory=list)
+
+
+# The form asks plain questions rather than offering merge fields. These are
+# the answers, and the generator turns them into an email.
+TARGET_TYPES = ("founder", "hiring_manager", "recruiter", "engineer", "professor")
+COMPANY_TYPES = ("edtech", "ai", "fintech", "faang", "agency", "research_lab", "other")
+INTENTS = ("internship", "full_time", "freelance", "research", "partnership", "feedback")
+
+
+class TargetIn(BaseModel):
+    name: str = ""
+    email: EmailStr
+    company: str = ""
+    role: str = ""
+    target_type: Literal[TARGET_TYPES] = "founder"  # type: ignore[valid-type]
+    company_type: Literal[COMPANY_TYPES] = "other"  # type: ignore[valid-type]
+    intent: Literal[INTENTS] = "internship"  # type: ignore[valid-type]
+    timezone: str = ""
+    # "What made you pick this person?" - the old `specific` merge field, asked
+    # in a way that needs no explanation.
+    hook: str = Field(default="", max_length=2000)
+    links: LinksIn = Field(default_factory=LinksIn)
+
+
+class TargetUpdate(BaseModel):
+    """Everything optional, and no email field.
+
+    Changing the address would carry the verification result, the touch count
+    and the Gmail thread over to a different person. Delete and re-add instead.
+    """
+
+    name: str | None = None
+    company: str | None = None
+    role: str | None = None
+    hook: str | None = None
+    timezone: str | None = None
+    target_type: Literal[TARGET_TYPES] | None = None  # type: ignore[valid-type]
+    company_type: Literal[COMPANY_TYPES] | None = None  # type: ignore[valid-type]
+    intent: Literal[INTENTS] | None = None  # type: ignore[valid-type]
+    links: LinksIn | None = None
+
+
+class TargetOut(BaseModel):
+    id: str
+    name: str
+    email: str
+    company: str
+    role: str
+    target_type: str
+    company_type: str
+    timezone: str
+    hook: str
+    intent: str
+    links: dict[str, Any]
+    verification: dict[str, Any]
+    status: str
+    status_detail: str
+    touches_sent: int
+    touches_remaining: int
+    last_touch_at: Any = None
+    can_send: bool
+    blocked_reason: str
 
 
 class ResumeOut(BaseModel):

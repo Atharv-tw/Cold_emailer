@@ -46,9 +46,30 @@ class Settings(BaseSettings):
     # not reveal which addresses it covers.
     recipient_guard_secret: str = ""
 
+    # https://quickemailverification.com - the free tier is 100 checks a day,
+    # which is comfortably more than this product's caps allow anyone to send.
+    quickemailverification_api_key: str = ""
+    quickemailverification_endpoint: str = (
+        "https://api.quickemailverification.com/v1/verify"
+    )
+
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.5-flash"
     gemini_endpoint: str = "https://generativelanguage.googleapis.com/v1beta"
+
+    # projects/<project>/topics/<topic>. The Gmail service account must have
+    # Publisher on it, or users.watch fails with a permission error that reads
+    # as though the scope is wrong.
+    gmail_pubsub_topic: str = ""
+    # Shared secret in the push endpoint's URL, so an open POST route cannot be
+    # used to make us hammer Gmail on someone else's behalf.
+    pubsub_verification_token: str = ""
+
+    # Web push. Generate a pair once and keep them:
+    #   npx web-push generate-vapid-keys
+    vapid_public_key: str = ""
+    vapid_private_key: str = ""
+    vapid_subject: str = "mailto:noreply@example.com"
 
     storage_dir: str = "./var/storage"
 
