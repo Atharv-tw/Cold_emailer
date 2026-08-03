@@ -1,5 +1,0 @@
-# Addresses and patterns that must never receive mail.
-# One per line. Lines starting with # are ignored.
-# Anyone who opts out is added here automatically - do not remove them.
-#
-# Seed it with your own domains so you never cold-email yourself or a colleague.

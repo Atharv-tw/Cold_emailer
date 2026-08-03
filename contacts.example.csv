@@ -1,4 +1,0 @@
-email,first_name,last_name,company,specific,specific_short,reaction
-priya.raman@exampleai.com,Priya,Raman,ExampleAI,your write-up on running agent tool-calls against a real staging environment instead of mocks,agent tool-calls against staging,I hit the same wall building an automated triage layer and ended up sandboxing it badly
-tom@northwind.io,Tom,Alvarez,Northwind,Northwind shipping row-level encryption for customer health records last month,Northwind's row-level encryption,I built a zero-knowledge version of roughly the same thing and would love to know what you rejected
-sara.chen@brightpath.co,Sara,Chen,Brightpath,your talk at PyData on why RAG evals keep leaking the eval set,your PyData talk on RAG evals,it explained a result I'd been misreading for a month

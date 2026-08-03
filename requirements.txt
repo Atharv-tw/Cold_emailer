@@ -1,6 +1,0 @@
-PyYAML>=6.0
-
-# Windows has no IANA timezone database, so Python's zoneinfo cannot resolve
-# names like Asia/Kolkata without this. Harmless (and unused) on Linux/macOS,
-# which read the system tzdata instead.
-tzdata>=2024.1
