@@ -1,0 +1,64 @@
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #16161a;
+  --muted: #5c5c66;
+  --line: #e4e4e9;
+  --accent: #1a5fd0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #101014;
+    --fg: #ececf1;
+    --muted: #9a9aa6;
+    --line: #26262e;
+    --accent: #6fa2ff;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 15px/1.6 -apple-system, "Segoe UI", system-ui, sans-serif;
+}
+
+main {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 4rem 1.25rem;
+}
+
+h1 {
+  font-size: 1.6rem;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.5rem;
+}
+
+p {
+  color: var(--muted);
+  margin: 0 0 1rem;
+}
+
+button {
+  font: inherit;
+  padding: 0.6rem 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+.note {
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.9rem 1rem;
+  margin: 1.5rem 0;
+  font-size: 0.9rem;
+}
