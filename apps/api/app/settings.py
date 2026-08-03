@@ -33,8 +33,20 @@ class Settings(BaseSettings):
     environment: str = "development"
     debug: bool = False
 
-    database_url: str = "postgresql+psycopg://outreach:outreach@localhost:5432/outreach"
+    # The application connects as a non-superuser, because superusers bypass
+    # row-level security outright and FORCE ROW LEVEL SECURITY does not change
+    # that. Connect as the owner and the policies silently protect nothing.
+    database_url: str = "postgresql+psycopg://outreach_app:outreach_app@localhost:5432/outreach"
+
+    # Migrations need the owner, which is a different role on purpose: the
+    # application should not be able to drop the policies that constrain it.
+    migration_database_url: str = ""
+
     redis_url: str = "redis://localhost:6379/0"
+
+    @property
+    def alembic_url(self) -> str:
+        return self.migration_database_url or self.database_url
 
     # Where the web app runs. Used for CORS and the OAuth redirect.
     web_origin: str = "http://localhost:3000"

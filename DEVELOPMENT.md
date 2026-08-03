@@ -84,7 +84,7 @@ cd apps/api && alembic upgrade head
 ```
 
 ```bash
-cd apps/api && uvicorn app.main:app --reload
+cd apps/api && python run_api.py --reload
 ```
 
 ```bash
@@ -116,6 +116,26 @@ filter makes the product correct, RLS makes a forgotten filter fail closed.
 
 Sessions announce who they are with `SELECT set_config('app.user_id', ..., true)`,
 which the policies compare against. A session that never sets it sees nothing.
+
+**Two database roles, and this is not optional.** Superusers bypass RLS
+outright, and `FORCE ROW LEVEL SECURITY` does not change that — so an
+application connecting as the schema owner sees every row of every user's data
+however carefully the policies are written. That was true here until it was
+tested against a live database.
+
+```
+outreach       owns the schema, runs migrations, superuser
+outreach_app   what the API and worker connect as, no bypass, DML only
+```
+
+`DATABASE_URL` uses the second; `MIGRATION_DATABASE_URL` uses the first. The
+application cannot drop the policies that constrain it, and `test_rls.py`
+asserts that along with the isolation itself.
+
+On Windows, `app/__init__.py` switches asyncio to the selector event loop —
+psycopg refuses to run async on the default proactor loop. Uvicorn builds its
+loop before importing the app, so start the API with `python run_api.py`
+rather than the uvicorn CLI.
 
 Sign-in is the exception, because it has to find a user before there is a user
 to bind to. Rather than a `BYPASSRLS` role - which would exempt every query on
