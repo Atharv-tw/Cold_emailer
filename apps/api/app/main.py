@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .db import engine
-from .routers import auth, health
+from .routers import auth, health, profile, resumes
 from .settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -52,3 +52,5 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(auth.router)
+app.include_router(profile.router)
+app.include_router(resumes.router)
