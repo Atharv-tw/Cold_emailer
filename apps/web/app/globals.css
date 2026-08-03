@@ -111,8 +111,29 @@ label {
   color: var(--muted);
 }
 
+pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: inherit;
+  margin: 0.4rem 0 0;
+}
+
+ul {
+  margin: 0.3rem 0;
+  padding-left: 1.1rem;
+}
+
+li {
+  margin: 0.2rem 0;
+}
+
+a {
+  color: var(--accent);
+}
+
 input[type="text"],
 input:not([type]),
+select,
 textarea {
   font: inherit;
   color: var(--fg);
