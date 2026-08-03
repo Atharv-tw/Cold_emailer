@@ -10,14 +10,24 @@ from __future__ import annotations
 
 import base64
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# One .env at the repo root, found regardless of where the process was
+# started from. Alembic runs in apps/api, uvicorn is usually started there
+# too, and the worker anywhere - a CWD-relative path silently loads nothing
+# and leaves you debugging an empty MASTER_KEY.
+REPO_ROOT = Path(__file__).resolve().parents[3]
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+        # Later entries win, so a local .env can still override the root one.
+        env_file=(REPO_ROOT / ".env", ".env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
     )
 
     environment: str = "development"
