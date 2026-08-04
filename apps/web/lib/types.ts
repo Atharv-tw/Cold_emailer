@@ -139,6 +139,51 @@ export type Dashboard = {
   suppressed: number;
 };
 
+export type ImportField = { key: string; label: string; required: boolean };
+
+export type ImportRowStatus =
+  | "ok"
+  | "needs_hook"
+  | "duplicate"
+  | "suppressed"
+  | "invalid";
+
+export type ImportRow = {
+  index: number;
+  name: string;
+  email: string;
+  company: string;
+  role: string;
+  status: ImportRowStatus;
+  issues: string[];
+  importable: boolean;
+};
+
+export type ImportSummary = {
+  total: number;
+  importable: number;
+  needs_hook: number;
+  duplicates: number;
+  suppressed: number;
+  invalid: number;
+};
+
+export type ImportPreview = {
+  headers: string[];
+  fields: ImportField[];
+  mapping: Record<string, string>;
+  unmapped_required: string[];
+  rows: ImportRow[];
+  summary: ImportSummary;
+};
+
+export type ImportCommitResult = {
+  created: number;
+  skipped: number;
+  skipped_reasons: Record<string, number>;
+  summary: ImportSummary;
+};
+
 export type ThreadMessage = {
   step: number;
   subject: string;

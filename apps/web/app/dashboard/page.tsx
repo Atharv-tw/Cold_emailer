@@ -84,6 +84,7 @@ export default async function DashboardPage() {
         <h2>People</h2>
         <p>
           <Link href="/targets/new">Add someone</Link> ·{" "}
+          <Link href="/import">Import a list</Link> ·{" "}
           <Link href="/profile">Your profile</Link>
         </p>
         {data.targets.length === 0 ? (
