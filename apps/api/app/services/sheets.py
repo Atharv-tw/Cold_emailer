@@ -1,14 +1,11 @@
 """Reading target lists out of CSV and Excel files.
 
-Unused in v1. Bulk import is a later milestone; this is here because the
-parsing is sound and worth not rewriting, and because it is the one piece of
-the old CLI that survives without being deliverability logic.
-
-Two things need attention before it is wired up: the alias table in
-`suggest_mapping` still names the old contact columns (first_name, last_name,
-title) rather than the target model's name / company / role / hook / intent,
-and nothing here enforces the per-target caps - a bulk importer that skips
-`may_schedule_touch` would be a way around the limits that make this tool safe.
+The parsing here is the durable part of the old CLI - the one piece that is
+not deliverability logic - and it is what bulk import (Phase 2) is built on.
+`suggest_mapping` now names the target model's own fields; the caps it warned
+about are enforced by the importer in `services.leads_import`, which routes
+every row through the same suppression, duplicate and cross-user guards that
+single-add does rather than writing straight to the table.
 
 An .xlsx is a zip of XML, so this needs no openpyxl. What is supported is
 deliberately narrow: the first worksheet, a header row, and cell values as
@@ -186,12 +183,33 @@ def suggest_mapping(headers: list[str], targets: list[str]) -> dict[str, str]:
         return re.sub(r"[^a-z0-9]+", "", text.lower())
 
     by_key = {key(t): t for t in targets}
+    # Header spellings that should line up with a target-model field. Keyed by
+    # the same normalisation as the headers, so "Email Address", "e-mail" and
+    # "EMAIL" all land on `email`. A single `name` column is what the model
+    # holds, so first-name headers map onto it rather than onto a field that
+    # does not exist.
     aliases = {
         "emailaddress": "email", "mail": "email", "e": "email",
-        "firstname": "first_name", "fname": "first_name", "given": "first_name",
-        "lastname": "last_name", "lname": "last_name", "surname": "last_name",
-        "organisation": "company", "organization": "company", "org": "company",
-        "employer": "company", "jobtitle": "title", "role": "title",
+        "emailid": "email", "workemail": "email",
+        "fullname": "name", "contactname": "name", "contact": "name",
+        "firstname": "name", "first": "name", "person": "name",
+        "companyname": "company", "organisation": "company",
+        "organization": "company", "org": "company", "employer": "company",
+        "business": "company", "account": "company",
+        "title": "role", "jobtitle": "role", "position": "role",
+        "designation": "role", "jobrole": "role",
+        "persona": "target_type", "contacttype": "target_type", "type": "target_type",
+        "industry": "company_type", "sector": "company_type", "vertical": "company_type",
+        "goal": "intent", "ask": "intent", "purpose": "intent", "objective": "intent",
+        "why": "hook", "note": "hook", "notes": "hook", "context": "hook",
+        "reason": "hook", "comment": "hook", "comments": "hook",
+        "personalisation": "hook", "personalization": "hook", "icebreaker": "hook",
+        "tz": "timezone",
+        "linkedinurl": "linkedin", "linkedinprofile": "linkedin", "li": "linkedin",
+        "website": "portfolio", "site": "portfolio", "url": "portfolio",
+        "web": "portfolio", "portfoliourl": "portfolio",
+        "githuburl": "github", "gh": "github",
+        "otherlink": "other",
     }
 
     mapping: dict[str, str] = {}

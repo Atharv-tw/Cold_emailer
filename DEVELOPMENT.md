@@ -15,6 +15,57 @@ bulk import lands. Everything else — `config.py`, `store.py`, `cli.py`,
 `panel.py`, `tracker.py`, `sequences/` — assumed one person with one config
 file and had no place here.
 
+## Product phases
+
+The product is being finished in phases so each slice can be reviewed and
+tested without turning the codebase into a moving target.
+
+### Phase 1 - template and evidence control
+
+Status: in progress.
+
+Implemented in this phase:
+
+- selectable generation templates exposed by `GET /v1/templates`
+- draft generation accepts `template_key`
+- profile projects have `categories` and `best_for` metadata
+- generation ranks projects against the target before building the prompt
+- profile UI exposes project tech, URL, categories, and best-fit audience
+- docs updated to match the current implementation
+
+Deferred intentionally:
+
+- user-authored templates and template version history
+- persisted "selected project" metadata on each generated draft
+
+### Phase 2 - import and workflow dashboard
+
+Planned:
+
+- CSV/XLSX import endpoint and mapping UI using `services/sheets.py`
+- duplicate/suppression/verification preview before saving imported targets
+- target table filters for status, target type, company type, and intent
+- workflow lanes for draft, scheduled, active, replied, paused, completed
+
+### Phase 3 - calendar reminders
+
+Planned:
+
+- Google Calendar reminder integration
+- reminder event creation for scheduled follow-ups
+- event update/cancel when a reply, bounce, opt-out, or manual stop occurs
+- dashboard and web push remain the fallback reminder system
+
+### Phase 4 - analytics and production hardening
+
+Planned:
+
+- reply rate, bounce rate, scheduled volume, and stale-sequence analytics
+- worker health/status UI
+- Gmail watch health and last reconcile timestamps
+- frontend regression tests
+- production deployment checklist
+
 ## packages/core
 
 The part of the CLI worth keeping: warmup ramps, business-day scheduling, send

@@ -27,6 +27,7 @@ router = APIRouter(prefix="/v1/targets/{target_id}/draft", tags=["drafts"])
 class GenerateIn(BaseModel):
     # Free-text steer for a regenerate: "mention the latency work", "warmer".
     instruction: str = Field(default="", max_length=2000)
+    template_key: str = Field(default="specific_hook", max_length=80)
 
 
 class DraftIn(BaseModel):
@@ -122,6 +123,7 @@ async def generate_draft(
             step=step,
             thread=thread,
             instruction=payload.instruction,
+            template_key=payload.template_key,
         )
     except AIError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc)) from exc

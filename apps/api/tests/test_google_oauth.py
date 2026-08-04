@@ -16,6 +16,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 
 from app.services.google_oauth import (
     CLOCK_SKEW,
+    REQUIRED_SCOPES,
     GoogleAuthError,
     missing_scopes,
     verify_id_token,
@@ -102,19 +103,22 @@ class VerifyIdTokenTests(unittest.TestCase):
 
 
 class MissingScopesTests(unittest.TestCase):
-    def test_reports_readonly_when_it_was_unticked(self) -> None:
-        granted = [
-            "openid",
-            "email",
-            "profile",
-            "https://www.googleapis.com/auth/gmail.send",
-        ]
-        self.assertEqual(
-            missing_scopes(granted),
-            ["https://www.googleapis.com/auth/gmail.readonly"],
-        )
+    # Verbatim from Google's token endpoint for a consent where every box was
+    # left ticked. Note `userinfo.email` and `userinfo.profile`: the grant does
+    # not come back under the alias it was asked for.
+    FULLY_GRANTED = [
+        "https://www.googleapis.com/auth/gmail.send",
+        "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/userinfo.email",
+        "openid",
+        "https://www.googleapis.com/auth/userinfo.profile",
+    ]
 
     def test_nothing_missing_when_everything_was_granted(self) -> None:
+        self.assertEqual(missing_scopes(self.FULLY_GRANTED), [])
+
+    def test_accepts_the_aliases_too(self) -> None:
+        """In case Google ever echoes back what it was asked for."""
         granted = [
             "openid",
             "email",
@@ -123,6 +127,21 @@ class MissingScopesTests(unittest.TestCase):
             "https://www.googleapis.com/auth/gmail.readonly",
         ]
         self.assertEqual(missing_scopes(granted), [])
+
+    def test_reports_readonly_when_it_was_unticked(self) -> None:
+        granted = [s for s in self.FULLY_GRANTED if not s.endswith("gmail.readonly")]
+        self.assertEqual(
+            missing_scopes(granted),
+            ["https://www.googleapis.com/auth/gmail.readonly"],
+        )
+
+    def test_reports_an_identity_scope_by_the_name_we_asked_for(self) -> None:
+        granted = [s for s in self.FULLY_GRANTED if not s.endswith("userinfo.email")]
+        self.assertEqual(missing_scopes(granted), ["email"])
+
+    def test_nothing_granted(self) -> None:
+        self.assertEqual(len(missing_scopes([])), len(REQUIRED_SCOPES))
+        self.assertEqual(len(missing_scopes(None)), len(REQUIRED_SCOPES))
 
 
 if __name__ == "__main__":

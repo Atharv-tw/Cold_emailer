@@ -82,6 +82,8 @@ RESUME_SCHEMA: dict[str, Any] = {
                     "tech": {"type": "string"},
                     "url": {"type": "string"},
                     "highlights": {"type": "array", "items": {"type": "string"}},
+                    "categories": {"type": "array", "items": {"type": "string"}},
+                    "best_for": {"type": "array", "items": {"type": "string"}},
                 },
                 "required": ["name"],
             },
@@ -266,12 +268,15 @@ def _extract_text(response: dict[str, Any]) -> str:
     candidate = candidates[0]
     parts = (candidate.get("content") or {}).get("parts") or []
     text = "".join(part.get("text", "") for part in parts).strip()
+    
+    reason = candidate.get("finishReason") or "unknown"
+    if reason == "MAX_TOKENS":
+        raise AIError(
+            "Gemini hit its output limit before finishing. If this was a "
+            "long resume, try trimming it."
+        )
+
     if not text:
-        reason = candidate.get("finishReason") or "unknown"
-        if reason == "MAX_TOKENS":
-            raise AIError(
-                "Gemini hit its output limit before finishing. If this was a "
-                "long resume, try trimming it."
-            )
         raise AIError(f"Gemini returned nothing (finishReason: {reason}).")
+        
     return text

@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "packages" / "core"))
 
 from app.services.generation import (  # noqa: E402
-    build_prompt, recipient_block, sender_block, split_subject,
+    build_prompt, ranked_projects, recipient_block, sender_block, split_subject,
 )
 from app.services.playbooks import (  # noqa: E402
     FOLLOW_UP_RULES, LAST_TOUCH_RULES, TARGET_PLAYBOOKS, playbook_for, touch_rules,
@@ -50,7 +50,17 @@ def target(**overrides):
 
 
 def projects():
-    return [SimpleNamespace(name="ratelimit", summary="token bucket library", tech="Rust")]
+    return [
+        SimpleNamespace(
+            name="ratelimit",
+            summary="token bucket library",
+            tech="Rust",
+            url="github.com/dana/ratelimit",
+            categories=["infra"],
+            best_for=["engineer"],
+            position=0,
+        )
+    ]
 
 
 def experience():
@@ -122,6 +132,40 @@ class TestPromptRules(unittest.TestCase):
         text = prompt(instruction="mention the latency work")
         self.assertIn("mention the latency work", text)
         self.assertIn("overrides the style guidance", text)
+
+    def test_selected_template_reaches_the_prompt(self):
+        text = prompt(template_key="project_fit")
+        self.assertIn("Selected template: Project fit", text)
+        self.assertIn("most relevant project", text)
+
+    def test_project_metadata_reaches_the_prompt(self):
+        text = prompt()
+        self.assertIn("best for: engineer", text)
+        self.assertIn("github.com/dana/ratelimit", text)
+
+    def test_projects_are_ranked_against_target_context(self):
+        ranked = ranked_projects(
+            [
+                SimpleNamespace(
+                    name="generic",
+                    summary="generic website",
+                    tech="React",
+                    categories=["frontend"],
+                    best_for=["recruiter"],
+                    position=0,
+                ),
+                SimpleNamespace(
+                    name="inference",
+                    summary="batched inference service",
+                    tech="Python",
+                    categories=["ai"],
+                    best_for=["founder"],
+                    position=1,
+                ),
+            ],
+            target(company_type="ai", target_type="founder"),
+        )
+        self.assertEqual(ranked[0].name, "inference")
 
 
 class TestFollowUps(unittest.TestCase):

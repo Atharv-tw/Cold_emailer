@@ -121,6 +121,8 @@ def upgrade() -> None:
         sa.Column("tech", sa.Text(), nullable=False, server_default=""),
         sa.Column("url", sa.Text(), nullable=False, server_default=""),
         sa.Column("highlights", postgresql.JSONB(), nullable=False, server_default="[]"),
+        sa.Column("categories", postgresql.JSONB(), nullable=False, server_default="[]"),
+        sa.Column("best_for", postgresql.JSONB(), nullable=False, server_default="[]"),
         sa.Column("position", sa.Integer(), nullable=False, server_default="0"),
         *_timestamps(),
     )

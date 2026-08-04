@@ -63,6 +63,8 @@ def _out(profile, projects, experience) -> ProfileOut:
                 "tech": p.tech,
                 "url": p.url,
                 "highlights": p.highlights or [],
+                "categories": p.categories or [],
+                "best_for": p.best_for or [],
             }
             for p in projects
         ],
@@ -135,6 +137,8 @@ async def replace_projects(
                 tech=item.tech.strip(),
                 url=item.url.strip(),
                 highlights=[h for h in item.highlights if h.strip()],
+                categories=[c.strip().lower() for c in item.categories if c.strip()],
+                best_for=[b.strip().lower() for b in item.best_for if b.strip()],
                 position=position,
             )
         )

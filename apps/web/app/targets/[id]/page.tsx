@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import DraftEditor from "@/components/DraftEditor";
 import { api } from "@/lib/api";
-import type { Draft, Target, TargetDetail } from "@/lib/types";
+import type { Draft, EmailTemplate, Target, TargetDetail } from "@/lib/types";
 
 const VERIFICATION_TONE: Record<string, string> = {
   deliverable: "ok",
@@ -22,11 +22,12 @@ export default async function TargetPage({
   if (!session?.apiUser) redirect("/");
 
   const { id } = await params;
-  const [target, detail, draft] = await Promise.all([
+  const [target, detail, draft, templates] = await Promise.all([
     api<Target>(`/v1/targets/${id}`),
     api<TargetDetail>(`/v1/targets/${id}/timeline`),
     // No draft yet is the normal state for a new target, not an error.
     api<Draft>(`/v1/targets/${id}/draft`).catch(() => null),
+    api<EmailTemplate[]>("/v1/templates"),
   ]);
 
   const verification = target.verification ?? {};
@@ -59,7 +60,7 @@ export default async function TargetPage({
         </div>
       )}
 
-      <DraftEditor target={target} initial={draft} />
+      <DraftEditor target={target} initial={draft} templates={templates} />
 
       <section>
         <h2>Thread</h2>

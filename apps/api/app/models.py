@@ -134,6 +134,8 @@ class ProfileProject(Base, TimestampMixin):
     tech: Mapped[str] = mapped_column(Text, default="")
     url: Mapped[str] = mapped_column(Text, default="")
     highlights: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    categories: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    best_for: Mapped[list[str]] = mapped_column(JSONB, default=list)
     position: Mapped[int] = mapped_column(Integer, default=0)
 
 

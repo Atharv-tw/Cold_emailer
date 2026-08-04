@@ -176,6 +176,80 @@ legend {
   font-size: 0.85rem;
 }
 
+/* Column mapping: a header on the left, the field it feeds on the right. */
+.map-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.map-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.map-header {
+  color: var(--fg);
+  font-size: 0.9rem;
+  word-break: break-word;
+}
+
+/* Import preview. Scrolls on its own so a wide file never pushes the page. */
+.table-scroll {
+  overflow-x: auto;
+}
+
+table.preview {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.85rem;
+}
+
+table.preview th,
+table.preview td {
+  text-align: left;
+  padding: 0.35rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+table.preview th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+table.preview tr.row-skip td {
+  opacity: 0.55;
+}
+
+.pill {
+  display: inline-block;
+  padding: 0.05rem 0.45rem;
+  border-radius: 0.6rem;
+  border: 1px solid var(--line);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.pill-ok {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.pill-needs_hook {
+  border-color: var(--accent);
+  color: var(--fg);
+}
+
+.pill-duplicate,
+.pill-suppressed,
+.pill-invalid {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
 .ok {
   color: var(--accent);
   font-size: 0.9rem;

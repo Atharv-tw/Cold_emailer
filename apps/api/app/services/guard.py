@@ -41,6 +41,32 @@ async def is_blocked(session: AsyncSession, email: str, secret: bytes, *, now: d
     )
 
 
+async def blocked_emails(
+    session: AsyncSession, emails: list[str], secret: bytes, *, now: datetime | None = None
+) -> set[str]:
+    """Which of these addresses the cross-user guard is currently blocking.
+
+    One query for the whole list rather than one per address: a bulk import
+    checks every row it is about to add, and doing that as N round-trips would
+    make a large file slow for no reason. Returns the blocked addresses as they
+    were passed in, so the caller can match them back to rows.
+    """
+    now = now or datetime.now(timezone.utc)
+    by_key = {recipient_key(email, secret): email for email in emails if email}
+    if not by_key:
+        return set()
+    rows = await session.scalars(
+        select(RecipientGuardRow).where(RecipientGuardRow.email_key.in_(list(by_key)))
+    )
+    return {
+        by_key[row.email_key]
+        for row in rows
+        if POLICY.blocks(
+            contact_count=row.contact_count, last_contacted_at=row.last_contacted_at, now=now
+        )
+    }
+
+
 async def record_contact(
     session: AsyncSession, email: str, secret: bytes, *, now: datetime | None = None
 ) -> int:

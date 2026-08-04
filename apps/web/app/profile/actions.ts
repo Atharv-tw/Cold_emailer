@@ -23,12 +23,10 @@ export async function uploadResume(form: FormData): Promise<ParsedResume> {
   forwarded.append("file", file);
   forwarded.append("keep_original", String(form.get("keep_original") === "on"));
 
-  // Content-Type is left unset so fetch writes the multipart boundary itself.
-  return api<ParsedResume>("/v1/resumes", {
-    method: "POST",
-    body: forwarded,
-    headers: {},
-  });
+  // `api` leaves Content-Type off a FormData body so fetch can write the
+  // multipart boundary itself. Passing `headers: {}` here does not achieve
+  // that - spreading an empty object removes nothing.
+  return api<ParsedResume>("/v1/resumes", { method: "POST", body: forwarded });
 }
 
 export async function saveProfile(payload: unknown): Promise<Profile> {
