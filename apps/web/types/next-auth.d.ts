@@ -10,6 +10,7 @@ declare module "next-auth" {
       connected: boolean;
       missing_scopes: string[];
       profile_complete: boolean;
+      calendar_connected: boolean;
     };
   }
 }

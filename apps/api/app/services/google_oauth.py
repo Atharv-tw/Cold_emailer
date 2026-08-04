@@ -37,6 +37,16 @@ REQUIRED_SCOPES = (
     "https://www.googleapis.com/auth/gmail.readonly",
 )
 
+# Optional, not in REQUIRED_SCOPES: the reminder layer. A user who declines it
+# still gets the whole product, only without calendar events mirrored from
+# their schedule, so it must never appear in `missing_scopes` and block sending.
+CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events"
+
+
+def has_calendar_scope(scopes: list[str] | None) -> bool:
+    return CALENDAR_SCOPE in {_canonical(scope) for scope in (scopes or [])}
+
+
 # `email` and `profile` are aliases. Google accepts them in the request and
 # then reports the grant under its canonical name, so a fully-granted account
 # comes back holding `.../userinfo.email` while we are still looking for

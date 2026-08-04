@@ -272,6 +272,13 @@ class ScheduleRow(Base, TimestampMixin):
     state: Mapped[str] = mapped_column(String(32), default="pending", index=True)
     attempts: Mapped[int] = mapped_column(Integer, default=0)
 
+    # The mirrored Google Calendar reminder, if the user connected one. The
+    # calendar is a synced layer, never the source of truth: this row decides
+    # when the follow-up is due, and `event_synced_due_at` records the time the
+    # calendar was last told so a moved due date can be detected and pushed.
+    google_event_id: Mapped[str] = mapped_column(Text, default="")
+    event_synced_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
 
 class Event(Base):
     __tablename__ = "events"

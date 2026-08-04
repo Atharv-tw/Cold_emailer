@@ -57,6 +57,14 @@ export default async function DashboardPage() {
         </div>
       )}
 
+      {user.connected && !user.calendar_connected && (
+        <div className="note">
+          <strong>Calendar reminders are off.</strong> Follow-ups still show up
+          here and as notifications. To also see them in Google Calendar, sign
+          in again and leave the calendar box ticked.
+        </div>
+      )}
+
       {/* Pinned at the top on purpose: this is the fallback that works when
           notifications are denied, revoked, or silently dropped. */}
       <section>
