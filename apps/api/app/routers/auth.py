@@ -7,6 +7,7 @@ prints it. It is decrypted in memory at send time and nowhere else.
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -20,6 +21,8 @@ from ..deps import CurrentUser, Db, SettingsDep
 from ..models import GoogleToken, Profile, User
 from ..security import COOKIE_NAME, issue_session
 from ..services.google_oauth import GoogleAuthError, missing_scopes, verify_id_token
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1/auth", tags=["auth"])
 
@@ -64,6 +67,10 @@ async def sign_in_with_google(
     try:
         identity = verify_id_token(payload.id_token, settings.google_client_id)
     except GoogleAuthError as exc:
+        # A rejected sign-in is the single most opaque failure in this system -
+        # the browser gets a generic error page and the reason lives here. The
+        # message names the check that failed and never includes the token.
+        logger.warning("google sign-in rejected: %s", exc)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, str(exc)) from exc
 
     # Sign-in is the one flow that has to find a user before there is a session

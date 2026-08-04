@@ -58,8 +58,16 @@ async function exchange(account: {
   });
 
   if (!response.ok) {
-    // Surfacing the status is enough; the body may quote the token back.
-    console.error(`API sign-in failed: ${response.status}`);
+    // The API's `detail` is our own message and never contains a token, so it
+    // is safe to log - and without it a failed sign-in is just a number, which
+    // is not enough to act on.
+    let detail = "";
+    try {
+      detail = ((await response.json()) as { detail?: string }).detail ?? "";
+    } catch {
+      detail = (await response.text().catch(() => "")).slice(0, 300);
+    }
+    console.error(`API sign-in failed: ${response.status} ${detail}`);
     return null;
   }
 
