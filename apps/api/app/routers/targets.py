@@ -12,7 +12,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Query, status
-from sqlalchemy import delete, select
+from sqlalchemy import delete, or_, select
 
 from outreach_core.limits import MAX_TOUCHES, TERMINAL_STATUSES, may_schedule_touch, remaining_touches
 
@@ -92,10 +92,38 @@ async def list_targets(
     user: CurrentUser,
     session: Db,
     status_filter: str | None = Query(None, alias="status"),
+    target_type: str | None = Query(None),
+    company_type: str | None = Query(None),
+    intent: str | None = Query(None),
+    q: str | None = Query(None, description="search over name, company and email"),
 ) -> list[TargetOut]:
+    """The list, narrowable by the same facets the target form offers.
+
+    An unknown facet value simply matches nothing rather than being rejected:
+    the filters are a convenience over one user's own rows, and a 422 on a
+    stale query string would be a worse experience than an empty list.
+    """
     query = select(Target).where(Target.user_id == user.id)
     if status_filter:
         query = query.where(Target.status == status_filter)
+    if target_type:
+        query = query.where(Target.target_type == target_type)
+    if company_type:
+        query = query.where(Target.company_type == company_type)
+    if intent:
+        query = query.where(Target.intent == intent)
+    if q and q.strip():
+        # ILIKE with the term escaped, so a name with a literal % or _ does not
+        # turn into a wildcard the user did not type.
+        term = q.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        like = f"%{term}%"
+        query = query.where(
+            or_(
+                Target.name.ilike(like, escape="\\"),
+                Target.company.ilike(like, escape="\\"),
+                Target.email.ilike(like, escape="\\"),
+            )
+        )
     rows = await session.scalars(query.order_by(Target.created_at.desc()))
     return [_out(row) for row in rows]
 
