@@ -37,6 +37,21 @@ REQUIRED_SCOPES = (
     "https://www.googleapis.com/auth/gmail.readonly",
 )
 
+# `email` and `profile` are aliases. Google accepts them in the request and
+# then reports the grant under its canonical name, so a fully-granted account
+# comes back holding `.../userinfo.email` while we are still looking for
+# `email`. Compared as plain strings that reads as two missing scopes, and the
+# warning it produces tells the user to consent again - which returns exactly
+# the same answer, forever.
+SCOPE_ALIASES = {
+    "email": "https://www.googleapis.com/auth/userinfo.email",
+    "profile": "https://www.googleapis.com/auth/userinfo.profile",
+}
+
+
+def _canonical(scope: str) -> str:
+    return SCOPE_ALIASES.get(scope, scope)
+
 
 class GoogleAuthError(Exception):
     pass
@@ -98,6 +113,9 @@ def missing_scopes(granted: list[str] | None) -> list[str]:
     `gmail.readonly` in particular leaves the app able to send but blind to
     replies, which is the one state this product must never operate in
     silently.
+
+    Both sides are canonicalised first, because the name a scope is granted
+    under is not always the name it was requested under.
     """
-    have = set(granted or [])
-    return [scope for scope in REQUIRED_SCOPES if scope not in have]
+    have = {_canonical(scope) for scope in (granted or [])}
+    return [scope for scope in REQUIRED_SCOPES if _canonical(scope) not in have]
