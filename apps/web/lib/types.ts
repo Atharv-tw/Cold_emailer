@@ -184,6 +184,49 @@ export type ImportCommitResult = {
   summary: ImportSummary;
 };
 
+export type AnalyticsFacetRow = { value: string; contacted: number; replied: number };
+
+export type Analytics = {
+  totals: {
+    sent: number;
+    contacted: number;
+    replied: number;
+    bounced: number;
+    opted_out: number;
+    reply_rate: number;
+    bounce_rate: number;
+    opt_out_rate: number;
+  };
+  active_sequences: number;
+  follow_ups_due: number;
+  stale: number;
+  by_target_type: AnalyticsFacetRow[];
+  by_company_type: AnalyticsFacetRow[];
+  by_intent: AnalyticsFacetRow[];
+};
+
+export type OpsJob = { job: string; at: string; detail: string };
+
+export type OpsFailedSend = {
+  target_id: string;
+  email: string;
+  error: string;
+  at: string | null;
+};
+
+export type Ops = {
+  worker_running: boolean;
+  jobs: OpsJob[];
+  connected: boolean;
+  disconnected_reason: string;
+  watch_last_renewed: string | null;
+  watch_expires_at: string | null;
+  watch_healthy: boolean;
+  reconcile_last_read: string | null;
+  follow_ups_due: number;
+  failed_sends: OpsFailedSend[];
+};
+
 export type ThreadMessage = {
   step: number;
   subject: string;

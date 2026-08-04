@@ -40,6 +40,10 @@ export default async function DashboardPage() {
   return (
     <main>
       <h1>Dashboard</h1>
+      <p>
+        <Link href="/analytics">Analytics</Link> ·{" "}
+        <Link href="/ops">Health</Link>
+      </p>
 
       {!user.connected && (
         <div className="note">

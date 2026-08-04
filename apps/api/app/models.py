@@ -330,6 +330,22 @@ class RecipientGuardRow(Base):
     contact_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
 
+class WorkerHeartbeat(Base):
+    """A single row the worker touches each tick, so the app can tell it is up.
+
+    Not user-scoped and carrying nothing private - just a timestamp per job -
+    so it stays outside row-level security and any request can read whether the
+    background worker ran recently. Without it, "is the worker running?" has no
+    honest answer: an idle worker and a dead one look identical from the data.
+    """
+
+    __tablename__ = "worker_heartbeat"
+
+    job: Mapped[str] = mapped_column(String(64), primary_key=True)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    detail: Mapped[str] = mapped_column(Text, default="")
+
+
 class PushSubscription(Base, TimestampMixin):
     __tablename__ = "push_subs"
     __table_args__ = (UniqueConstraint("user_id", "endpoint", name="uq_push_user_endpoint"),)

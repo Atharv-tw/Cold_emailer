@@ -24,9 +24,12 @@ from datetime import datetime, timedelta, timezone
 from arq import cron
 from arq.connections import RedisSettings
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from .db import SessionFactory, bind_user
-from .models import GmailWatch, GoogleToken, Message, ScheduleRow, Target, User
+from .models import (
+    GmailWatch, GoogleToken, Message, ScheduleRow, Target, User, WorkerHeartbeat,
+)
 from .services import calendar_sync, replies
 from .services.gmail import GmailAuthRevoked, GmailClient, GmailError
 from .services.google_oauth import has_calendar_scope
@@ -47,6 +50,25 @@ WATCH_RENEW_BEFORE = timedelta(days=2)
 
 async def _client_for(session, user: User) -> GmailClient:
     return GmailClient(await access_token_for(session, user, settings))
+
+
+async def _beat(job: str, detail: str = "") -> None:
+    """Record that a background job just ran.
+
+    Its own session, unbound: the heartbeat table is outside row-level security
+    on purpose, so this does not need - and must not assume - a bound user.
+    """
+    now = datetime.now(timezone.utc)
+    async with SessionFactory() as session:
+        await session.execute(
+            pg_insert(WorkerHeartbeat)
+            .values(job=job, at=now, detail=detail[:500])
+            .on_conflict_do_update(
+                index_elements=[WorkerHeartbeat.job],
+                set_={"at": now, "detail": detail[:500]},
+            )
+        )
+        await session.commit()
 
 
 async def _mark_disconnected(session, user: User, reason: str) -> None:
@@ -134,6 +156,7 @@ async def tick(_ctx: dict) -> dict:
                 await session.rollback()
                 logger.exception("tick failed for schedule row %s", row.id)
 
+    await _beat("tick", f"sent {sent}, skipped {skipped}")
     return {"sent": sent, "skipped": skipped}
 
 
@@ -182,6 +205,7 @@ async def renew_watches(_ctx: dict) -> dict:
                 logger.exception("watch renewal failed for user %s", user.id)
                 failed += 1
 
+    await _beat("renew_watches", f"renewed {renewed}, failed {failed}")
     return {"renewed": renewed, "failed": failed}
 
 
@@ -212,6 +236,7 @@ async def reconcile(_ctx: dict) -> dict:
                 await session.rollback()
                 logger.exception("reconcile failed for user %s", user.id)
 
+    await _beat("reconcile", f"checked {checked}, stopped {stopped}")
     return {"users_checked": checked, "sequences_stopped": stopped}
 
 
@@ -292,6 +317,7 @@ async def sync_calendars(_ctx: dict) -> dict:
                 await session.rollback()
                 logger.exception("calendar sync failed for user %s", user.id)
 
+    await _beat("sync_calendars", f"synced {synced}, skipped {skipped}")
     return {"users_synced": synced, "users_skipped": skipped}
 
 
