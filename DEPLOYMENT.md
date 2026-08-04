@@ -1,0 +1,156 @@
+# Deployment
+
+A checklist for standing this up somewhere real. It assumes the architecture in
+`DEVELOPMENT.md`: a FastAPI service, a long-running `arq` worker sharing that
+codebase, Postgres, Redis, a Next.js front end, and one Google OAuth client.
+
+Nothing here is serverless-shaped. The worker has to run continuously, and the
+API needs a host that stays up between requests.
+
+## 1. Secrets
+
+Generate these once and keep them somewhere durable. Losing `MASTER_KEY` means
+every stored Google refresh token becomes undecryptable and every user has to
+reconnect; rotating `RECIPIENT_GUARD_SECRET` resets the cross-user guard.
+
+```bash
+python -c "import os,base64;print('MASTER_KEY=' + base64.b64encode(os.urandom(32)).decode())"
+python -c "import secrets;print('SESSION_SECRET=' + secrets.token_urlsafe(48))"
+python -c "import secrets;print('RECIPIENT_GUARD_SECRET=' + secrets.token_urlsafe(48))"
+python -c "import secrets;print('PUBSUB_VERIFICATION_TOKEN=' + secrets.token_urlsafe(24))"
+npx web-push generate-vapid-keys   # VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY
+```
+
+`SESSION_SECRET` and `RECIPIENT_GUARD_SECRET` must be at least 32 bytes or the
+API refuses to start - a short HMAC key is a session token anyone can grind.
+`MASTER_KEY` must decode to exactly 32 bytes.
+
+## 2. Environment variables
+
+Read from one `.env` at the repo root (see `.env.example`). The API and the
+worker must share it.
+
+| Variable | Required | Notes |
+|---|---|---|
+| `DATABASE_URL` | yes | App role, **not** the owner. `postgresql+psycopg://outreach_app:…` |
+| `MIGRATION_DATABASE_URL` | yes | Schema owner. Used only by Alembic. |
+| `REDIS_URL` | yes | Worker queue. |
+| `WEB_ORIGIN` | yes | Public URL of the web app. CORS + calendar event links. |
+| `API_BASE_URL` | yes | Public URL of the API. Used in the Pub/Sub push subscription. |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | yes | One OAuth Web client, shared by both apps. |
+| `SESSION_SECRET` | yes | Signs our own session tokens. ≥32 bytes. |
+| `MASTER_KEY` | yes | Encrypts refresh tokens at rest. 32 bytes, base64. |
+| `RECIPIENT_GUARD_SECRET` | yes | Keys the cross-user pile-on guard. ≥32 bytes. |
+| `GEMINI_API_KEY` | yes | Draft generation and resume parsing. |
+| `QUICKEMAILVERIFICATION_API_KEY` | recommended | Address verification. Without it, verification returns `unknown` (never blocks). |
+| `GMAIL_PUBSUB_TOPIC` | for push | `projects/<project>/topics/<topic>`. Without it, reply detection falls back to the reconcile sweep. |
+| `PUBSUB_VERIFICATION_TOKEN` | for push | Shared secret in the push URL. |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | for web push | Optional; the dashboard "due today" list is the real mechanism. |
+| `STORAGE_DIR` | yes | Where uploaded resumes are written before parsing. |
+| `ENVIRONMENT` | yes | Set to `production`; makes the session cookie `Secure`. |
+
+`GET /readyz` reports whether the database is reachable and whether
+`MASTER_KEY`, `SESSION_SECRET`, `RECIPIENT_GUARD_SECRET` and `GOOGLE_CLIENT_ID`
+are actually set. Wire it to your load balancer's health check.
+
+The web app additionally needs `AUTH_SECRET` (Auth.js), `API_BASE_URL`, and the
+Google client credentials in its own environment.
+
+## 3. Database
+
+Two roles, and this is not optional - a superuser or the schema owner bypasses
+row-level security outright, so the API must connect as a role that cannot:
+
+```sql
+CREATE ROLE outreach LOGIN PASSWORD '…';            -- owns the schema, runs migrations
+CREATE ROLE outreach_app LOGIN PASSWORD '…';        -- what the API/worker connect as
+CREATE DATABASE outreach OWNER outreach;
+```
+
+`outreach_app` needs `USAGE` on the schema and DML on the tables; migration
+`0002` grants that and turns RLS on for every user-scoped table. Run migrations
+with the owner URL:
+
+```bash
+cd apps/api && MIGRATION_DATABASE_URL=… alembic upgrade head
+```
+
+Migrations, newest last: `0001` schema, `0002` app role + RLS, `0003` project
+metadata, `0004` calendar event tracking, `0005` worker heartbeat. `test_rls.py`
+asserts the isolation and that the app role cannot drop its own policies; run it
+against a throwaway database before trusting a new environment.
+
+## 4. Redis and the worker
+
+Redis backs the `arq` queue. The worker is a separate long-running process:
+
+```bash
+cd apps/api && arq app.worker.WorkerSettings
+```
+
+Run exactly the environment the API runs with. If the worker is down, nothing
+sends and replies go unnoticed - `/ops` reports `worker_running: false` once the
+`tick` heartbeat is older than ten minutes, so alert on that.
+
+## 5. Google OAuth
+
+One OAuth client (Web application). The consent screen stays in **testing** mode:
+up to 100 users, no CASA review, `gmail.readonly` from day one.
+
+- Authorized redirect URI: `<WEB_ORIGIN>/api/auth/callback/google`.
+- Scopes: `openid email profile`, `gmail.send`, `gmail.readonly`, and the
+  optional `calendar.events`.
+- **Every account that signs in must be added by hand** under *APIs & Services →
+  OAuth consent screen → Audience → Test users*. An account not on the list gets
+  `Error 403: access_denied` and cannot proceed. That list is what the 100-user
+  cap counts.
+
+## 6. Gmail push (Pub/Sub)
+
+1. Create a Pub/Sub topic; set `GMAIL_PUBSUB_TOPIC` to its full name.
+2. Grant `gmail-api-push@system.gserviceaccount.com` the **Publisher** role on
+   it, or `users.watch` fails with an error that reads like a scope problem.
+3. Create a push subscription pointing at
+   `<API_BASE_URL>/v1/gmail/push?token=<PUBSUB_VERIFICATION_TOKEN>`.
+
+The token is not decoration: Google posts there, not a signed-in user, so
+without it the route is an open POST that could make the service hammer Gmail.
+
+The `renew_watches` job re-arms every account daily because `watch` expires in
+about seven days and then stops delivering silently.
+
+## 7. Web app
+
+```bash
+cd apps/web && npm ci && npm run build && npm run start
+```
+
+The service worker caches nothing on purpose - a cold-outreach dashboard showing
+stale "have they replied yet" is worse than one that fails to load.
+
+## 8. Backups and restore
+
+- **Postgres is the source of truth** - the schedule, targets, threads, and
+  encrypted refresh tokens all live here. Take regular `pg_dump` backups and
+  test a restore.
+- Backups contain encrypted refresh tokens but **not** `MASTER_KEY`. A restore
+  is only useful alongside the same `MASTER_KEY`; back that key up separately and
+  never in the database.
+- Redis holds only the transient job queue. Losing it drops in-flight jobs, which
+  the next `tick`/`reconcile` re-derives from Postgres; no backup needed.
+- `STORAGE_DIR` holds resume files only until they are parsed (deleted unless the
+  user kept the original), so it is not critical to back up.
+- The calendar layer is a mirror, not a backup: if events are lost, the next
+  `sync_calendars` pass recreates them from the schedule.
+
+## 9. Go-live checklist
+
+- [ ] `GET /readyz` returns `ready: true` against production.
+- [ ] `test_rls.py` passes against a copy of the production database shape.
+- [ ] API connects as `outreach_app`; migrations ran as `outreach`.
+- [ ] Worker process is running; `/ops` shows a recent `tick` heartbeat.
+- [ ] OAuth redirect URI matches `WEB_ORIGIN`; test users added.
+- [ ] Pub/Sub topic, Publisher grant, and push subscription in place; a test
+      reply flips a target to `replied`.
+- [ ] `MASTER_KEY` backed up somewhere other than the database.
+- [ ] A `pg_dump` has been taken and a restore rehearsed.
