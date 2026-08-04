@@ -176,6 +176,57 @@ legend {
   font-size: 0.85rem;
 }
 
+/* Operating-panel buckets: a count and a label, linking into the list. */
+.buckets {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+  gap: 0.6rem;
+}
+
+.bucket {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  text-decoration: none;
+  color: var(--fg);
+}
+
+.bucket:hover {
+  border-color: var(--accent);
+}
+
+.bucket-count {
+  font-size: 1.4rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.bucket-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* Facet + search controls over the people list. */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.filters select,
+.filters input[type="text"] {
+  flex: 0 1 auto;
+}
+
+.filters input[type="text"] {
+  min-width: 14rem;
+  flex: 1 1 14rem;
+}
+
 /* Column mapping: a header on the left, the field it feeds on the right. */
 .map-grid {
   display: flex;

@@ -95,6 +95,16 @@ async def dashboard(user: CurrentUser, session: Db) -> DashboardOut:
         )
         or 0
     )
+    # Targets with at least one follow-up still queued. Counted over distinct
+    # targets, not rows, so a sequence with two pending steps is one "scheduled".
+    scheduled_total = int(
+        await session.scalar(
+            select(func.count(func.distinct(ScheduleRow.target_id))).where(
+                ScheduleRow.user_id == user.id, ScheduleRow.state == "pending"
+            )
+        )
+        or 0
+    )
 
     due_rows = list(
         await session.scalars(
@@ -170,7 +180,9 @@ async def dashboard(user: CurrentUser, session: Db) -> DashboardOut:
             "opted_out": status_counts.get("opted_out", 0),
             "active": status_counts.get("active", 0),
             "draft": status_counts.get("draft", 0),
+            "paused": status_counts.get("paused", 0),
             "completed": status_counts.get("completed", 0),
+            "scheduled": scheduled_total,
         },
         due=due,
         recent=recent,
