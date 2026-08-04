@@ -201,3 +201,52 @@ class ResumeOut(BaseModel):
     filename: str
     parsed_at: Any = None
     original_kept: bool
+
+
+# ------------------------------------------------------------------ bulk import
+
+
+class ImportField(BaseModel):
+    """One column an uploaded file may feed, named as the form asks it."""
+
+    key: str
+    label: str
+    required: bool
+
+
+class ImportRowOut(BaseModel):
+    index: int  # 1-based row number among the file's data rows
+    name: str
+    email: str
+    company: str
+    role: str
+    # ok | needs_hook | duplicate | suppressed | invalid
+    status: str
+    issues: list[str]
+    importable: bool
+
+
+class ImportSummary(BaseModel):
+    total: int
+    importable: int
+    needs_hook: int
+    duplicates: int
+    suppressed: int
+    invalid: int
+
+
+class ImportPreviewOut(BaseModel):
+    headers: list[str]
+    fields: list[ImportField]
+    mapping: dict[str, str]  # header -> field key, as applied
+    unmapped_required: list[str]
+    rows: list[ImportRowOut]
+    summary: ImportSummary
+
+
+class ImportCommitOut(BaseModel):
+    created: int
+    skipped: int
+    # reason -> count, so the user can see why anything was left out
+    skipped_reasons: dict[str, int]
+    summary: ImportSummary

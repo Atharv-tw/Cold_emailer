@@ -35,6 +35,8 @@ from .gmail import (
     GmailAuthRevoked, GmailClient, GmailError, GmailRateLimited,
     exchange_refresh_token,
 )
+from .leads_import import needs_import_verification
+from .verification import EmailVerifier
 
 WARMUP = WarmupPolicy()
 
@@ -130,6 +132,7 @@ async def send_one(
     rng: random.Random | None = None,
     force_window: bool = False,
     gmail: GmailClient | None = None,
+    verifier: EmailVerifier | None = None,
 ) -> SendOutcome:
     now = now or datetime.now(timezone.utc)
     rng = rng or random.Random()
@@ -158,6 +161,30 @@ async def send_one(
         target.status = "opted_out"
         target.status_detail = suppressed.reason
         return SendOutcome(False, f"suppressed: {suppressed.reason}")
+
+    # 1a. Deliverability, but only for a bulk-imported address that has never
+    #     been checked. Single-add verifies at creation; import defers the paid
+    #     check to here - the first moment it actually matters - so a large
+    #     file costs nothing until a message is really about to go out. The
+    #     result is persisted, so this runs once per target and never again.
+    if needs_import_verification(target.verification):
+        checker = verifier or EmailVerifier(
+            api_key=settings.quickemailverification_api_key,
+            endpoint=settings.quickemailverification_endpoint,
+        )
+        result = await checker.verify(target.email)
+        target.verification = result.to_json()
+        if result.blocks_sending:
+            target.status_detail = result.detail
+            session.add(
+                Event(
+                    user_id=user.id,
+                    target_id=target.id,
+                    type="verification_failed",
+                    detail=result.detail,
+                )
+            )
+            return SendOutcome(False, result.detail)
 
     # 2. Minimum gap between touches for this one person.
     if target.last_touch_at is not None:
