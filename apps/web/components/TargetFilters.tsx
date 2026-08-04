@@ -72,22 +72,38 @@ export default function TargetFilters({ active }: { active: Record<string, strin
   return (
     <section>
       <div className="filters">
-        <select value={active.status ?? ""} onChange={(e) => apply({ status: e.target.value })}>
+        <select
+          aria-label="Filter by status"
+          value={active.status ?? ""}
+          onChange={(e) => apply({ status: e.target.value })}
+        >
           {STATUSES.map(([value, label]) => (
             <option key={value} value={value}>{label}</option>
           ))}
         </select>
-        <select value={active.target_type ?? ""} onChange={(e) => apply({ target_type: e.target.value })}>
+        <select
+          aria-label="Filter by who they are"
+          value={active.target_type ?? ""}
+          onChange={(e) => apply({ target_type: e.target.value })}
+        >
           {TARGET_TYPES.map(([value, label]) => (
             <option key={value} value={value}>{label}</option>
           ))}
         </select>
-        <select value={active.company_type ?? ""} onChange={(e) => apply({ company_type: e.target.value })}>
+        <select
+          aria-label="Filter by company type"
+          value={active.company_type ?? ""}
+          onChange={(e) => apply({ company_type: e.target.value })}
+        >
           {COMPANY_TYPES.map(([value, label]) => (
             <option key={value} value={value}>{label}</option>
           ))}
         </select>
-        <select value={active.intent ?? ""} onChange={(e) => apply({ intent: e.target.value })}>
+        <select
+          aria-label="Filter by goal"
+          value={active.intent ?? ""}
+          onChange={(e) => apply({ intent: e.target.value })}
+        >
           {INTENTS.map(([value, label]) => (
             <option key={value} value={value}>{label}</option>
           ))}
