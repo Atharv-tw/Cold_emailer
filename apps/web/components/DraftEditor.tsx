@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { generateDraft, saveDraft, scheduleSend, sendNow } from "@/app/dashboard/actions";
-import type { Draft, Target } from "@/lib/types";
+import type { Draft, EmailTemplate, Target } from "@/lib/types";
 
 /**
  * Write, check, send.
@@ -17,15 +17,18 @@ import type { Draft, Target } from "@/lib/types";
 export default function DraftEditor({
   target,
   initial,
+  templates,
 }: {
   target: Target;
   initial: Draft | null;
+  templates: EmailTemplate[];
 }) {
   const router = useRouter();
   const [subject, setSubject] = useState(initial?.subject ?? "");
   const [body, setBody] = useState(initial?.body ?? "");
   const [warnings, setWarnings] = useState<string[]>(initial?.warnings ?? []);
   const [instruction, setInstruction] = useState("");
+  const [templateKey, setTemplateKey] = useState(templates[0]?.key ?? "specific_hook");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
@@ -72,6 +75,20 @@ export default function DraftEditor({
 
       <section>
         <label>
+          Template
+          <select value={templateKey} onChange={(event) => setTemplateKey(event.target.value)}>
+            {templates.map((template) => (
+              <option key={template.key} value={template.key}>
+                {template.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="muted">
+          {templates.find((template) => template.key === templateKey)?.description}
+        </p>
+
+        <label>
           Steer the writing (optional)
           <input
             value={instruction}
@@ -86,7 +103,7 @@ export default function DraftEditor({
           onClick={() =>
             run(async () => {
               setStatus("Writing…");
-              const draft = await generateDraft(target.id, instruction);
+              const draft = await generateDraft(target.id, instruction, templateKey);
               setSubject(draft.subject);
               setBody(draft.body);
               setWarnings(draft.warnings);

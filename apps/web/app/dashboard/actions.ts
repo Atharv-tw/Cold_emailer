@@ -39,10 +39,14 @@ export async function stopTarget(id: string, suppress: boolean): Promise<Target>
   return target;
 }
 
-export async function generateDraft(id: string, instruction: string): Promise<Draft> {
+export async function generateDraft(
+  id: string,
+  instruction: string,
+  templateKey: string,
+): Promise<Draft> {
   return api<Draft>(`/v1/targets/${id}/draft`, {
     method: "POST",
-    body: JSON.stringify({ instruction }),
+    body: JSON.stringify({ instruction, template_key: templateKey }),
   });
 }
 

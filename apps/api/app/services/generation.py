@@ -19,6 +19,7 @@ from outreach_core.limits import MAX_TOUCHES
 from outreach_core.templating import lint
 
 from .gemini import SYSTEM_RULES, AIError, GeminiClient
+from .email_templates import DEFAULT_TEMPLATE_KEY, template_for
 from .playbooks import company_context_for, intent_for, playbook_for, touch_rules
 
 
@@ -51,7 +52,11 @@ def sender_block(profile, projects: list, experience: list) -> str:
 
     if projects:
         rendered = "\n".join(
-            f"- {p.name}: {p.summary}" + (f" ({p.tech})" if p.tech else "")
+            f"- {p.name}: {p.summary}"
+            + (f" ({p.tech})" if p.tech else "")
+            + (f" [{', '.join(p.categories)}]" if getattr(p, "categories", None) else "")
+            + (f" best for: {', '.join(p.best_for)}" if getattr(p, "best_for", None) else "")
+            + (f" link: {p.url}" if p.url else "")
             for p in projects[:5]
         )
         lines += f"\n\nThe sender's projects:\n{rendered}"
@@ -65,6 +70,62 @@ def sender_block(profile, projects: list, experience: list) -> str:
         lines += f"\n\nThe sender's experience:\n{rendered}"
 
     return lines
+
+
+def _tokens(*values: str) -> set[str]:
+    tokens: set[str] = set()
+    for value in values:
+        tokens.update(
+            part.strip().lower()
+            for part in str(value or "").replace("_", " ").replace("-", " ").split()
+            if part.strip()
+        )
+    return tokens
+
+
+def ranked_projects(projects: list, target) -> list:
+    """Put the most relevant sender evidence first for this target."""
+    target_terms = _tokens(
+        target.company_type,
+        target.target_type,
+        target.intent,
+        target.role,
+        target.company,
+        target.hook,
+    )
+
+    def score(project) -> tuple[int, int]:
+        categories = _tokens(*getattr(project, "categories", []) or [])
+        best_for = _tokens(*getattr(project, "best_for", []) or [])
+        tech = _tokens(getattr(project, "tech", ""))
+        name = _tokens(getattr(project, "name", ""))
+        summary = _tokens(getattr(project, "summary", ""))
+        weighted = (
+            4 * len(best_for & target_terms)
+            + 3 * len(categories & target_terms)
+            + 2 * len(tech & target_terms)
+            + len((name | summary) & target_terms)
+        )
+        # Negative position keeps stable profile order as the tie-breaker.
+        return weighted, -int(getattr(project, "position", 0) or 0)
+
+    return sorted(projects, key=score, reverse=True)
+
+
+def selected_evidence_block(projects: list, target) -> str:
+    ranked = ranked_projects(projects, target)
+    if not ranked:
+        return ""
+    project = ranked[0]
+    rows = {
+        "project": getattr(project, "name", ""),
+        "summary": getattr(project, "summary", ""),
+        "tech": getattr(project, "tech", ""),
+        "url": getattr(project, "url", ""),
+        "categories": ", ".join(getattr(project, "categories", []) or []),
+        "best for": ", ".join(getattr(project, "best_for", []) or []),
+    }
+    return _block("Best matching sender evidence to consider first:", rows)
 
 
 def recipient_block(target) -> str:
@@ -89,14 +150,17 @@ def build_prompt(
     step: int,
     thread: list[tuple[str, str]] | None = None,
     instruction: str = "",
+    template_key: str = DEFAULT_TEMPLATE_KEY,
 ) -> str:
     """Assemble the full prompt for one email."""
     company_context = company_context_for(target.company_type)
     intent = intent_for(target.intent)
+    template = template_for(template_key)
 
     parts = [
         SYSTEM_RULES,
         touch_rules(step, MAX_TOUCHES),
+        f"Selected template: {template.name}\n{template.guidance}",
         f"Who you are writing to:\n{playbook_for(target.target_type)}",
     ]
     if company_context:
@@ -105,6 +169,9 @@ def build_prompt(
         parts.append(intent)
 
     parts.append(sender_block(profile, projects, experience))
+    evidence = selected_evidence_block(projects, target)
+    if evidence:
+        parts.append(evidence)
     parts.append(recipient_block(target))
 
     if not (target.hook or "").strip():
@@ -159,6 +226,7 @@ async def generate(
     step: int,
     thread: list[tuple[str, str]] | None = None,
     instruction: str = "",
+    template_key: str = DEFAULT_TEMPLATE_KEY,
     temperature: float = 0.7,
 ) -> Draft:
     prompt = build_prompt(
@@ -169,8 +237,9 @@ async def generate(
         step=step,
         thread=thread,
         instruction=instruction,
+        template_key=template_key,
     )
-    text = await client.generate_text(prompt, temperature=temperature, max_output_tokens=1024)
+    text = await client.generate_text(prompt, temperature=temperature, max_output_tokens=4096)
     subject, body = split_subject(text)
 
     if not body:

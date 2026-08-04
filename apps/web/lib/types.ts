@@ -5,6 +5,8 @@ export type Project = {
   tech: string;
   url: string;
   highlights: string[];
+  categories: string[];
+  best_for: string[];
 };
 
 export type Experience = {
@@ -91,6 +93,12 @@ export type Draft = {
   warnings: string[];
   is_follow_up: boolean;
   touches_remaining: number;
+};
+
+export type EmailTemplate = {
+  key: string;
+  name: string;
+  description: string;
 };
 
 export type SendResult = {

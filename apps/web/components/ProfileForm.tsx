@@ -35,6 +35,13 @@ const FIELD_LABELS: Record<string, string> = {
   availability: "Availability",
 };
 
+function commaList(value: string): string[] {
+  return value
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+}
+
 export default function ProfileForm({ profile, disclosure }: Props) {
   const [headline, setHeadline] = useState(profile.headline);
   const [bio, setBio] = useState(profile.bio);
@@ -272,6 +279,46 @@ export default function ProfileForm({ profile, disclosure }: Props) {
                 claim("projects");
               }}
             />
+            <input
+              value={(project.tech ?? "")}
+              placeholder="Tech used, e.g. FastAPI, Postgres, RAG"
+              onChange={(event) => {
+                const next = [...projects];
+                next[index] = { ...project, tech: event.target.value };
+                setProjects(next);
+                claim("projects");
+              }}
+            />
+            <input
+              value={(project.url ?? "")}
+              placeholder="Project link"
+              onChange={(event) => {
+                const next = [...projects];
+                next[index] = { ...project, url: event.target.value };
+                setProjects(next);
+                claim("projects");
+              }}
+            />
+            <input
+              value={(project.categories ?? []).join(", ")}
+              placeholder="Categories: ai, fintech, infra"
+              onChange={(event) => {
+                const next = [...projects];
+                next[index] = { ...project, categories: commaList(event.target.value) };
+                setProjects(next);
+                claim("projects");
+              }}
+            />
+            <input
+              value={(project.best_for ?? []).join(", ")}
+              placeholder="Best for: founder, recruiter, internship"
+              onChange={(event) => {
+                const next = [...projects];
+                next[index] = { ...project, best_for: commaList(event.target.value) };
+                setProjects(next);
+                claim("projects");
+              }}
+            />
             <button
               type="button"
               className="quiet"
@@ -287,7 +334,15 @@ export default function ProfileForm({ profile, disclosure }: Props) {
           onClick={() =>
             setProjects([
               ...projects,
-              { name: "", summary: "", tech: "", url: "", highlights: [] },
+              {
+                name: "",
+                summary: "",
+                tech: "",
+                url: "",
+                highlights: [],
+                categories: [],
+                best_for: [],
+              },
             ])
           }
         >
