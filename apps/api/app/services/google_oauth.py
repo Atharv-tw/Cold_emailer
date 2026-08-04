@@ -10,6 +10,7 @@ app - sign in as anyone here.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import timedelta
 from functools import lru_cache
 
 import jwt
@@ -17,6 +18,14 @@ from jwt import PyJWKClient
 
 CERTS_URL = "https://www.googleapis.com/oauth2/v3/certs"
 ISSUERS = ("https://accounts.google.com", "accounts.google.com")
+
+# Tolerated clock skew between this server and Google. Without it, a server
+# whose clock runs a second slow rejects every token as "not yet valid (iat)",
+# because the token was stamped by Google's clock and ours has not caught up -
+# a total sign-in outage caused by nothing but an unsynced host. Google's own
+# `google-auth` allows the same ten seconds for the same reason. It is far too
+# short to matter against a stolen token, whose lifetime is an hour.
+CLOCK_SKEW = timedelta(seconds=10)
 
 # Scopes the product needs. `gmail.readonly` is what makes reply tracking
 # possible; without it we would be sending into a void and guessing.
@@ -59,6 +68,7 @@ def verify_id_token(id_token: str, client_id: str) -> GoogleIdentity:
             algorithms=["RS256"],
             audience=client_id,
             issuer=list(ISSUERS),
+            leeway=CLOCK_SKEW,
         )
     except jwt.PyJWTError as exc:
         raise GoogleAuthError(f"could not verify Google ID token: {exc}") from exc
