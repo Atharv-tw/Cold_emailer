@@ -58,6 +58,7 @@ class ProjectIn(BaseModel):
     summary: str = ""
     tech: str = ""
     url: str = ""
+    demo_url: str = ""
     highlights: list[str] = Field(default_factory=list)
     categories: list[str] = Field(default_factory=list)
     best_for: list[str] = Field(default_factory=list)

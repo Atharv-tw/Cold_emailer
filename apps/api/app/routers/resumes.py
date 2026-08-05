@@ -117,6 +117,7 @@ def _project(raw: dict) -> dict:
         "summary": str(raw.get("summary", "")),
         "tech": str(raw.get("tech", "")),
         "url": str(raw.get("url", "")),
+        "demo_url": str(raw.get("demo_url", "")),
         "highlights": [str(h) for h in (raw.get("highlights") or [])],
     }
 

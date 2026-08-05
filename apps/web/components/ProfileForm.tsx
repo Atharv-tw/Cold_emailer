@@ -291,10 +291,20 @@ export default function ProfileForm({ profile, disclosure }: Props) {
             />
             <input
               value={(project.url ?? "")}
-              placeholder="Project link"
+              placeholder="Live link (site, repo, app store)"
               onChange={(event) => {
                 const next = [...projects];
                 next[index] = { ...project, url: event.target.value };
+                setProjects(next);
+                claim("projects");
+              }}
+            />
+            <input
+              value={(project.demo_url ?? "")}
+              placeholder="Demo video link (optional, e.g. a Loom or YouTube walkthrough)"
+              onChange={(event) => {
+                const next = [...projects];
+                next[index] = { ...project, demo_url: event.target.value };
                 setProjects(next);
                 claim("projects");
               }}
@@ -339,6 +349,7 @@ export default function ProfileForm({ profile, disclosure }: Props) {
                 summary: "",
                 tech: "",
                 url: "",
+                demo_url: "",
                 highlights: [],
                 categories: [],
                 best_for: [],

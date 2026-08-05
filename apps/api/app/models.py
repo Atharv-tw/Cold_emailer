@@ -133,6 +133,9 @@ class ProfileProject(Base, TimestampMixin):
     summary: Mapped[str] = mapped_column(Text, default="")
     tech: Mapped[str] = mapped_column(Text, default="")
     url: Mapped[str] = mapped_column(Text, default="")
+    # A demo video, distinct from the live link - a recruiter with no time to
+    # click through a live product will still watch ninety seconds of one.
+    demo_url: Mapped[str] = mapped_column(Text, default="")
     highlights: Mapped[list[str]] = mapped_column(JSONB, default=list)
     categories: Mapped[list[str]] = mapped_column(JSONB, default=list)
     best_for: Mapped[list[str]] = mapped_column(JSONB, default=list)

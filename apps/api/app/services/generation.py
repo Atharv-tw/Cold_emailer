@@ -56,7 +56,8 @@ def sender_block(profile, projects: list, experience: list) -> str:
             + (f" ({p.tech})" if p.tech else "")
             + (f" [{', '.join(p.categories)}]" if getattr(p, "categories", None) else "")
             + (f" best for: {', '.join(p.best_for)}" if getattr(p, "best_for", None) else "")
-            + (f" link: {p.url}" if p.url else "")
+            + (f" live link: {p.url}" if p.url else "")
+            + (f" demo video: {p.demo_url}" if getattr(p, "demo_url", None) else "")
             for p in projects[:5]
         )
         lines += f"\n\nThe sender's projects:\n{rendered}"
@@ -83,9 +84,22 @@ def _tokens(*values: str) -> set[str]:
     return tokens
 
 
-def ranked_projects(projects: list, target) -> list:
-    """Put the most relevant sender evidence first for this target."""
-    target_terms = _tokens(
+def _match_score(project, target_terms: set[str]) -> int:
+    categories = _tokens(*getattr(project, "categories", []) or [])
+    best_for = _tokens(*getattr(project, "best_for", []) or [])
+    tech = _tokens(getattr(project, "tech", ""))
+    name = _tokens(getattr(project, "name", ""))
+    summary = _tokens(getattr(project, "summary", ""))
+    return (
+        4 * len(best_for & target_terms)
+        + 3 * len(categories & target_terms)
+        + 2 * len(tech & target_terms)
+        + len((name | summary) & target_terms)
+    )
+
+
+def _target_terms(target) -> set[str]:
+    return _tokens(
         target.company_type,
         target.target_type,
         target.intent,
@@ -94,38 +108,72 @@ def ranked_projects(projects: list, target) -> list:
         target.hook,
     )
 
-    def score(project) -> tuple[int, int]:
-        categories = _tokens(*getattr(project, "categories", []) or [])
-        best_for = _tokens(*getattr(project, "best_for", []) or [])
-        tech = _tokens(getattr(project, "tech", ""))
-        name = _tokens(getattr(project, "name", ""))
-        summary = _tokens(getattr(project, "summary", ""))
-        weighted = (
-            4 * len(best_for & target_terms)
-            + 3 * len(categories & target_terms)
-            + 2 * len(tech & target_terms)
-            + len((name | summary) & target_terms)
-        )
-        # Negative position keeps stable profile order as the tie-breaker.
-        return weighted, -int(getattr(project, "position", 0) or 0)
 
-    return sorted(projects, key=score, reverse=True)
+def ranked_projects(projects: list, target) -> list:
+    """Put the most relevant sender evidence first for this target."""
+    target_terms = _target_terms(target)
+
+    def sort_key(project) -> tuple[int, int]:
+        # Negative position keeps stable profile order as the tie-breaker.
+        return _match_score(project, target_terms), -int(getattr(project, "position", 0) or 0)
+
+    return sorted(projects, key=sort_key, reverse=True)
 
 
 def selected_evidence_block(projects: list, target) -> str:
-    ranked = ranked_projects(projects, target)
+    """The one or two pieces of sender evidence most relevant to this target.
+
+    Handing the model the whole project list and hoping it picks well is how
+    you get an email about the wrong thing. Ranking and naming the best match
+    explicitly is what makes the email specific instead of generic.
+    """
+    ranked = [p for p in ranked_projects(projects, target) if str(getattr(p, "name", "")).strip()]
     if not ranked:
         return ""
-    project = ranked[0]
-    rows = {
-        "project": getattr(project, "name", ""),
-        "summary": getattr(project, "summary", ""),
-        "tech": getattr(project, "tech", ""),
-        "url": getattr(project, "url", ""),
-        "categories": ", ".join(getattr(project, "categories", []) or []),
-        "best for": ", ".join(getattr(project, "best_for", []) or []),
-    }
-    return _block("Best matching sender evidence to consider first:", rows)
+
+    target_terms = _target_terms(target)
+    scored = [(p, _match_score(p, target_terms)) for p in ranked]
+
+    def rows(project) -> dict[str, str]:
+        return {
+            "project": getattr(project, "name", ""),
+            "summary": getattr(project, "summary", ""),
+            "tech": getattr(project, "tech", ""),
+            "live link": getattr(project, "url", ""),
+            "demo video": getattr(project, "demo_url", ""),
+            "categories": ", ".join(getattr(project, "categories", []) or []),
+            "best for": ", ".join(getattr(project, "best_for", []) or []),
+        }
+
+    top_project, top_score = scored[0]
+    if top_score > 0:
+        blocks = [
+            _block(
+                "The best-matching project for this recipient - reference this one by name:",
+                rows(top_project),
+            )
+        ]
+        second_project, second_score = scored[1] if len(scored) > 1 else (None, 0)
+        if second_project is not None and second_score > 0:
+            blocks.append(
+                _block("A second option, only if it fits the specific ask better:", rows(second_project))
+            )
+    else:
+        # Nothing in the profile actually matches this recipient. Naming one
+        # as "best matching" anyway is how the model invents relevance that
+        # is not there, which reads as generic even when it namechecks a
+        # real project. Offer it as a plain option instead.
+        blocks = [
+            _block(
+                "Nothing in the sender's projects is a clear match for this "
+                "recipient's context. This is just the sender's most prominent "
+                "project - use it only if you can say something specific and "
+                "true about it; otherwise lean on the recipient's own context "
+                "(their hook, role, company) instead of forcing a project in:",
+                rows(top_project),
+            )
+        ]
+    return "\n\n".join(blocks)
 
 
 def recipient_block(target) -> str:

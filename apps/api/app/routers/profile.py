@@ -136,6 +136,7 @@ async def replace_projects(
                 summary=item.summary.strip(),
                 tech=item.tech.strip(),
                 url=item.url.strip(),
+                demo_url=item.demo_url.strip(),
                 highlights=[h for h in item.highlights if h.strip()],
                 categories=[c.strip().lower() for c in item.categories if c.strip()],
                 best_for=[b.strip().lower() for b in item.best_for if b.strip()],

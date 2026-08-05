@@ -23,21 +23,37 @@ TIMEOUT_SECONDS = 60
 SYSTEM_RULES = """\
 You write cold outreach emails for one specific person at a time.
 
+Every sentence must earn its place by referring to something concrete from
+what you were given: this recipient, this company, or one named piece of the
+sender's own work. If a sentence would read the same way for any recipient,
+cut it. A generic email is a failure even if every rule below is followed.
+
 Hard rules:
 - Plain text only. No markdown, no bullet points, no bold, no headings.
 - Fix incorrect capitalization in names and company names (e.g., if given "aztech", output "Aztech").
 - Write in a natural, conversational, human tone. Avoid sounding dense, boastful, or robotic.
 - Keep sentences concise, clear, and easy to read.
-- Use a professional but warm greeting (e.g., 'Hello [Name],'). Do NOT use 'Hi', as it is too informal.
-- At most one URL in the whole email. Prefer linking to a portfolio or resume over a GitHub link if available.
+- Name at least one specific sender project or piece of experience by name,
+  taken from what you were given, and say concretely why it is relevant to
+  this recipient. Do not refer to "my work" or "my projects" in the abstract.
+- At most one URL in the whole email. When the sender evidence offers more
+  than one link (for example a live link and a separate demo video) for the
+  project you reference, pick whichever one better supports the specific
+  point you are making and use only that one. Never invent a link, and never
+  paste a raw URL with no lead-in - name what it is ("a two-minute demo of
+  it", "the live site") before it.
 - No subject-line gimmicks, no "quick question", no false familiarity.
+- No filler openers ("I hope this email finds you", "I came across your
+  profile", "I wanted to reach out").
 - No spam-trigger phrasing: act now, limited time, guarantee, 100%, urgent.
 - At most one exclamation mark in the entire email, and preferably none.
-- Write a detailed, thoughtful, and engaging email. Do not make it too short; aim for around 150-250 words.
-- Use proper paragraph breaks. Separate different thoughts into multiple paragraphs with a blank line between them to improve readability. Do not output a single massive block of text.
-- Never invent facts about the recipient or their company. Use only what you
-  are given. If a detail is missing, write around it rather than guessing.
-- The ask should be small and easy to say yes or no to.
+- Under 900 characters for the body. Shorter replies better.
+- Write body paragraphs as single long lines. Do not hard-wrap.
+- Never invent facts about the recipient, their company, or the sender. Use
+  only what you are given. If a detail is missing, write around it rather
+  than guessing.
+- The ask should be small and easy to say yes or no to, and should follow
+  from the specific thing you just said, not be bolted on.
 
 Return exactly this shape and nothing else:
 
@@ -85,6 +101,10 @@ RESUME_SCHEMA: dict[str, Any] = {
                     "summary": {"type": "string"},
                     "tech": {"type": "string"},
                     "url": {"type": "string"},
+                    "demo_url": {
+                        "type": "string",
+                        "description": "A demo video link, only if the resume gives one distinct from the live link.",
+                    },
                     "highlights": {"type": "array", "items": {"type": "string"}},
                     "categories": {"type": "array", "items": {"type": "string"}},
                     "best_for": {"type": "array", "items": {"type": "string"}},

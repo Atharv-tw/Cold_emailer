@@ -4,6 +4,7 @@ export type Project = {
   summary: string;
   tech: string;
   url: string;
+  demo_url: string;
   highlights: string[];
   categories: string[];
   best_for: string[];
