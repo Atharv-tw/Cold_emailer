@@ -70,8 +70,8 @@ export default function TargetFilters({ active }: { active: Record<string, strin
   const anyActive = Object.values(active).some((value) => value && value.trim());
 
   return (
-    <section>
-      <div className="filters">
+    <section style={{ display: "flex", flexWrap: "wrap", gap: "1rem", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
         <select
           aria-label="Filter by status"
           value={active.status ?? ""}
@@ -110,7 +110,7 @@ export default function TargetFilters({ active }: { active: Record<string, strin
         </select>
       </div>
       <form
-        className="filters"
+        style={{ display: "flex", gap: "0.5rem" }}
         onSubmit={(event) => {
           event.preventDefault();
           apply({ q: search });
@@ -122,12 +122,13 @@ export default function TargetFilters({ active }: { active: Record<string, strin
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search name, company or email"
           aria-label="Search"
+          style={{ width: "250px" }}
         />
-        <button type="submit" className="quiet">Search</button>
+        <button type="submit" className="primary">Search</button>
         {anyActive && (
           <button
             type="button"
-            className="quiet"
+            className="secondary"
             onClick={() => {
               setSearch("");
               router.push(pathname);
