@@ -20,7 +20,12 @@ from ..db import SessionFactory, bind_user
 from ..deps import CurrentUser, Db, SettingsDep
 from ..models import GoogleToken, Profile, User
 from ..security import COOKIE_NAME, issue_session
-from ..services.google_oauth import GoogleAuthError, missing_scopes, verify_id_token
+from ..services.google_oauth import (
+    GoogleAuthError,
+    has_calendar_scope,
+    missing_scopes,
+    verify_id_token,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -44,9 +49,18 @@ class SessionOut(BaseModel):
     connected: bool
     missing_scopes: list[str]
     profile_complete: bool
+    # Whether the optional calendar-reminder scope was granted.
+    calendar_connected: bool = False
 
 
-def _session_out(user: User, *, connected: bool, missing: list[str], profile: Profile | None) -> SessionOut:
+def _session_out(
+    user: User,
+    *,
+    connected: bool,
+    missing: list[str],
+    profile: Profile | None,
+    scopes: list[str] | None = None,
+) -> SessionOut:
     return SessionOut(
         id=str(user.id),
         email=user.email,
@@ -55,6 +69,7 @@ def _session_out(user: User, *, connected: bool, missing: list[str], profile: Pr
         connected=connected,
         missing_scopes=missing,
         profile_complete=bool(profile and profile.headline and profile.bio),
+        calendar_connected=has_calendar_scope(scopes),
     )
 
 
@@ -146,11 +161,13 @@ async def sign_in_with_google(
             expires=expires,
             path="/",
         )
+        scopes = payload.scopes or (token_row.scopes if token_row else [])
         return _session_out(
             user,
             connected=token_row is not None,
-            missing=missing_scopes(payload.scopes or (token_row.scopes if token_row else [])),
+            missing=missing_scopes(scopes),
             profile=profile,
+            scopes=scopes,
         )
 
 
@@ -163,6 +180,7 @@ async def me(user: CurrentUser, session: Db) -> SessionOut:
         connected=token_row is not None and user.disconnected_at is None,
         missing=missing_scopes(token_row.scopes if token_row else []),
         profile=profile,
+        scopes=token_row.scopes if token_row else [],
     )
 
 

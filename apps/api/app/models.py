@@ -272,6 +272,13 @@ class ScheduleRow(Base, TimestampMixin):
     state: Mapped[str] = mapped_column(String(32), default="pending", index=True)
     attempts: Mapped[int] = mapped_column(Integer, default=0)
 
+    # The mirrored Google Calendar reminder, if the user connected one. The
+    # calendar is a synced layer, never the source of truth: this row decides
+    # when the follow-up is due, and `event_synced_due_at` records the time the
+    # calendar was last told so a moved due date can be detected and pushed.
+    google_event_id: Mapped[str] = mapped_column(Text, default="")
+    event_synced_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
 
 class Event(Base):
     __tablename__ = "events"
@@ -321,6 +328,22 @@ class RecipientGuardRow(Base):
     email_key: Mapped[str] = mapped_column(String(64), primary_key=True)
     last_contacted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     contact_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+
+class WorkerHeartbeat(Base):
+    """A single row the worker touches each tick, so the app can tell it is up.
+
+    Not user-scoped and carrying nothing private - just a timestamp per job -
+    so it stays outside row-level security and any request can read whether the
+    background worker ran recently. Without it, "is the worker running?" has no
+    honest answer: an idle worker and a dead one look identical from the data.
+    """
+
+    __tablename__ = "worker_heartbeat"
+
+    job: Mapped[str] = mapped_column(String(64), primary_key=True)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    detail: Mapped[str] = mapped_column(Text, default="")
 
 
 class PushSubscription(Base, TimestampMixin):

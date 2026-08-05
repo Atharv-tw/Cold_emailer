@@ -17,54 +17,52 @@ file and had no place here.
 
 ## Product phases
 
-The product is being finished in phases so each slice can be reviewed and
-tested without turning the codebase into a moving target.
+The product was finished in phases so each slice could be reviewed and tested
+without turning the codebase into a moving target. All four have shipped; see
+`DEPLOYMENT.md` for the production checklist.
 
 ### Phase 1 - template and evidence control
-
-Status: in progress.
-
-Implemented in this phase:
 
 - selectable generation templates exposed by `GET /v1/templates`
 - draft generation accepts `template_key`
 - profile projects have `categories` and `best_for` metadata
 - generation ranks projects against the target before building the prompt
 - profile UI exposes project tech, URL, categories, and best-fit audience
-- docs updated to match the current implementation
 
-Deferred intentionally:
-
-- user-authored templates and template version history
-- persisted "selected project" metadata on each generated draft
+Deferred intentionally: user-authored templates and version history; persisted
+"selected project" metadata on each generated draft.
 
 ### Phase 2 - import and workflow dashboard
 
-Planned:
-
-- CSV/XLSX import endpoint and mapping UI using `services/sheets.py`
-- duplicate/suppression/verification preview before saving imported targets
-- target table filters for status, target type, company type, and intent
-- workflow lanes for draft, scheduled, active, replied, paused, completed
+- CSV/XLSX import (`POST /v1/import/preview` + `/commit`) built on
+  `services/sheets.py`, with a mapping and review UI at `/import`
+- every row held to the same gates as single-add - duplicate, suppression,
+  cross-user guard, real address - in `services/leads_import.py`
+- deferred deliverability: imported targets are verified in the send path the
+  first time a message is about to go out, so a large import costs no credits
+- `/targets` list filters by status, target type, company type and intent and
+  searches name/company/email; the dashboard is a bucket panel over statuses
 
 ### Phase 3 - calendar reminders
 
-Planned:
-
-- Google Calendar reminder integration
-- reminder event creation for scheduled follow-ups
-- event update/cancel when a reply, bounce, opt-out, or manual stop occurs
+- optional `calendar.events` scope; a `sync_calendars` worker job mirrors each
+  scheduled follow-up onto the user's Google Calendar
+- the database schedule is the source of truth; sync is one-directional and
+  best-effort, and every lifecycle case (reschedule, out-of-office defer, reply,
+  bounce, manual stop, completed send) is covered because they all surface as
+  `ScheduleRow` changes that `calendar_sync.plan_action` turns into
+  create/update/delete
 - dashboard and web push remain the fallback reminder system
 
 ### Phase 4 - analytics and production hardening
 
-Planned:
-
-- reply rate, bounce rate, scheduled volume, and stale-sequence analytics
-- worker health/status UI
-- Gmail watch health and last reconcile timestamps
-- frontend regression tests
-- production deployment checklist
+- analytics (`GET /v1/analytics`, `/analytics`): reply/bounce/opt-out rates
+  against people contacted, active sequences, follow-ups due, stale sequences,
+  and a contacted/replied breakdown by target type, company type and intent
+- operational health (`GET /v1/ops`, `/ops`): worker heartbeat, Gmail watch
+  health, last reconcile, Google connection, and recent failed sends
+- frontend regression tests under `apps/web/test` (`npm run test`)
+- `DEPLOYMENT.md` production checklist
 
 ## packages/core
 
@@ -171,7 +169,14 @@ immediately. That list is what the 100-user cap actually counts.
 Approved testers still see the "unverified app" warning, which is expected and
 which onboarding explains before they hit it.
 
-Scopes: `openid email profile`, `gmail.send`, `gmail.readonly`.
+Scopes: `openid email profile`, `gmail.send`, `gmail.readonly`, and the optional
+`calendar.events`.
+
+`calendar.events` is the only optional one: it powers the reminder layer, and an
+account that declines it keeps the whole product, only without follow-ups
+mirrored to Google Calendar. Google shows it as its own toggle; the API records
+whether it was granted (`calendar_connected`) and the dashboard offers to ask
+again.
 
 `gmail.readonly` is what makes reply tracking possible. Google's consent screen
 lets people untick individual scopes, and an account that can send but cannot
@@ -214,7 +219,8 @@ that connection - there is one `SECURITY DEFINER` function,
 
 ## The worker
 
-The API alone does not send anything. `app.worker` holds four jobs:
+The API alone does not send anything. `app.worker` holds five jobs, and each
+touches a `worker_heartbeat` row so `/ops` can tell the worker is alive:
 
 | job | cadence | why it exists |
 |---|---|---|
@@ -222,6 +228,7 @@ The API alone does not send anything. `app.worker` holds four jobs:
 | `renew_watches` | daily | Gmail's `watch` expires in ~7 days and then stops delivering **silently** — no error, no callback. Nothing tells us when it lapses, so it is re-armed every day regardless. |
 | `reconcile` | 4×/day | reads threads directly for anything push missed. Slow, so it runs rarely; it is what makes a broken push pipeline survivable rather than dangerous. |
 | `notify_due` | daily | web push for follow-ups coming due |
+| `sync_calendars` | every 5 min | mirrors each user's schedule onto their Google Calendar, if they granted the optional scope. Best-effort; the schedule stays the source of truth. |
 
 ```bash
 cd apps/api && arq app.worker.WorkerSettings
@@ -284,9 +291,16 @@ python -m unittest discover -s packages/core/tests
 python -m unittest discover -s apps/api/tests
 ```
 
-190 tests, no network and no database. The Gmail transport, Gemini and the
-verifier are all driven through injected `httpx` transports against real
-response shapes.
+197 tests, no network and no database. The Gmail transport, the calendar
+client, Gemini and the verifier are all driven through injected `httpx`
+transports against real response shapes.
+
+The web has its own suite - jsdom component tests for the import wizard, the
+target form, and the people filters:
+
+```bash
+cd apps/web && npm run test
+```
 
 Not covered by these: anything that needs Postgres. `send_one` runs every
 limit check in sequence against live rows, and the end-to-end proof of it is

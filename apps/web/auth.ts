@@ -22,6 +22,10 @@ const SCOPES = [
   "profile",
   "https://www.googleapis.com/auth/gmail.send",
   "https://www.googleapis.com/auth/gmail.readonly",
+  // Optional: create follow-up reminders on the user's calendar. Google shows
+  // it as a separate, uncheckable-on-its-own item; declining it leaves the
+  // rest of the product working, only without the mirrored reminders.
+  "https://www.googleapis.com/auth/calendar.events",
 ].join(" ");
 
 const API_BASE = process.env.API_BASE_URL ?? "http://localhost:8000";
@@ -34,6 +38,7 @@ type ApiSession = {
   connected: boolean;
   missing_scopes: string[];
   profile_complete: boolean;
+  calendar_connected: boolean;
 };
 
 async function exchange(account: {

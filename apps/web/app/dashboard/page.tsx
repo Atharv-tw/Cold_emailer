@@ -14,6 +14,19 @@ function when(iso: string): string {
   });
 }
 
+// The operating panel. Each bucket is a count from the dashboard payload and,
+// where a status maps to it, a link into the filtered people list.
+const BUCKETS: { key: string; label: string; href: string }[] = [
+  { key: "draft", label: "Drafts needed", href: "/targets?status=draft" },
+  { key: "scheduled", label: "Scheduled", href: "/targets?status=active" },
+  { key: "active", label: "In flight", href: "/targets?status=active" },
+  { key: "replied", label: "Replied", href: "/targets?status=replied" },
+  { key: "paused", label: "Paused", href: "/targets?status=paused" },
+  { key: "completed", label: "Completed", href: "/targets?status=completed" },
+  { key: "bounced", label: "Bounced", href: "/targets?status=bounced" },
+  { key: "opted_out", label: "Opted out", href: "/targets?status=opted_out" },
+];
+
 export default async function DashboardPage() {
   const session = await auth();
   if (!session?.apiUser) redirect("/");
@@ -27,6 +40,10 @@ export default async function DashboardPage() {
   return (
     <main>
       <h1>Dashboard</h1>
+      <p>
+        <Link href="/analytics">Analytics</Link> ·{" "}
+        <Link href="/ops">Health</Link>
+      </p>
 
       {!user.connected && (
         <div className="note">
@@ -41,6 +58,14 @@ export default async function DashboardPage() {
           <code>gmail.readonly</code> this can send but cannot see replies —
           the one state it must not run in. Sign in again and leave every box
           ticked.
+        </div>
+      )}
+
+      {user.connected && !user.calendar_connected && (
+        <div className="note">
+          <strong>Calendar reminders are off.</strong> Follow-ups still show up
+          here and as notifications. To also see them in Google Calendar, sign
+          in again and leave the calendar box ticked.
         </div>
       )}
 
@@ -71,38 +96,30 @@ export default async function DashboardPage() {
       <PwaSetup vapidKey={pushKey.key} />
 
       <section>
-        <h2>Totals</h2>
+        <h2>Where everyone is</h2>
+        <div className="buckets">
+          {BUCKETS.map((bucket) => (
+            <Link key={bucket.label} href={bucket.href} className="bucket">
+              <span className="bucket-count">{data.counts[bucket.key] ?? 0}</span>
+              <span className="bucket-label">{bucket.label}</span>
+            </Link>
+          ))}
+        </div>
         <p className="muted">
-          {data.counts.sent} sent · {data.counts.replied} replied ·{" "}
-          {data.counts.bounced} bounced · {data.counts.opted_out} opted out ·{" "}
-          {data.counts.active} in flight · {data.suppressed} on your suppression
-          list
+          {data.counts.sent} sent in total · {data.suppressed} on your
+          do-not-contact list
         </p>
       </section>
 
       <section>
         <h2>People</h2>
         <p>
+          <Link href="/targets">See everyone</Link> ·{" "}
           <Link href="/targets/new">Add someone</Link> ·{" "}
           <Link href="/import">Import a list</Link> ·{" "}
           <Link href="/profile">Your profile</Link>
         </p>
-        {data.targets.length === 0 ? (
-          <p className="muted">Nobody yet.</p>
-        ) : (
-          <ul>
-            {data.targets.map((target) => (
-              <li key={target.id}>
-                <Link href={`/targets/${target.id}`}>{target.name || target.email}</Link>{" "}
-                <span className="muted">
-                  · {target.status}
-                  {target.touches_sent > 0 && ` · ${target.touches_sent} of 3 sent`}
-                  {target.status_detail && ` · ${target.status_detail}`}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
+        {data.targets.length === 0 && <p className="muted">Nobody yet.</p>}
       </section>
 
       <section>

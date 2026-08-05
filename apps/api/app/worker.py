@@ -24,11 +24,15 @@ from datetime import datetime, timedelta, timezone
 from arq import cron
 from arq.connections import RedisSettings
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from .db import SessionFactory, bind_user
-from .models import GmailWatch, Message, ScheduleRow, Target, User
-from .services import replies
+from .models import (
+    GmailWatch, GoogleToken, Message, ScheduleRow, Target, User, WorkerHeartbeat,
+)
+from .services import calendar_sync, replies
 from .services.gmail import GmailAuthRevoked, GmailClient, GmailError
+from .services.google_oauth import has_calendar_scope
 from .services.push import notify
 from .services.sending import access_token_for, send_one
 from .settings import get_settings
@@ -46,6 +50,25 @@ WATCH_RENEW_BEFORE = timedelta(days=2)
 
 async def _client_for(session, user: User) -> GmailClient:
     return GmailClient(await access_token_for(session, user, settings))
+
+
+async def _beat(job: str, detail: str = "") -> None:
+    """Record that a background job just ran.
+
+    Its own session, unbound: the heartbeat table is outside row-level security
+    on purpose, so this does not need - and must not assume - a bound user.
+    """
+    now = datetime.now(timezone.utc)
+    async with SessionFactory() as session:
+        await session.execute(
+            pg_insert(WorkerHeartbeat)
+            .values(job=job, at=now, detail=detail[:500])
+            .on_conflict_do_update(
+                index_elements=[WorkerHeartbeat.job],
+                set_={"at": now, "detail": detail[:500]},
+            )
+        )
+        await session.commit()
 
 
 async def _mark_disconnected(session, user: User, reason: str) -> None:
@@ -133,6 +156,7 @@ async def tick(_ctx: dict) -> dict:
                 await session.rollback()
                 logger.exception("tick failed for schedule row %s", row.id)
 
+    await _beat("tick", f"sent {sent}, skipped {skipped}")
     return {"sent": sent, "skipped": skipped}
 
 
@@ -181,6 +205,7 @@ async def renew_watches(_ctx: dict) -> dict:
                 logger.exception("watch renewal failed for user %s", user.id)
                 failed += 1
 
+    await _beat("renew_watches", f"renewed {renewed}, failed {failed}")
     return {"renewed": renewed, "failed": failed}
 
 
@@ -211,6 +236,7 @@ async def reconcile(_ctx: dict) -> dict:
                 await session.rollback()
                 logger.exception("reconcile failed for user %s", user.id)
 
+    await _beat("reconcile", f"checked {checked}, stopped {stopped}")
     return {"users_checked": checked, "sequences_stopped": stopped}
 
 
@@ -255,9 +281,49 @@ async def notify_due(_ctx: dict) -> dict:
     return {"users_notified": notified}
 
 
+async def sync_calendars(_ctx: dict) -> dict:
+    """Mirror every connected calendar onto the schedule.
+
+    Runs on a short cycle so a newly scheduled, moved, or cancelled follow-up
+    shows up as a reminder promptly. Only users who granted the optional
+    calendar scope are touched; for everyone else this does nothing. The
+    schedule is the source of truth, so a pass that fails for one user changes
+    no send and simply retries next time.
+    """
+    synced = skipped = 0
+    async with SessionFactory() as session:
+        users = list(await session.scalars(select(User).where(User.disconnected_at.is_(None))))
+
+    for user in users:
+        async with SessionFactory() as session:
+            await bind_user(session, user.id)
+            try:
+                current = await session.get(User, user.id)
+                if current is None:
+                    continue
+                token = await session.get(GoogleToken, current.id)
+                if token is None or not has_calendar_scope(token.scopes):
+                    skipped += 1
+                    continue
+                await calendar_sync.sync_user(session, user=current, settings=settings)
+                await session.commit()
+                synced += 1
+            except GmailAuthRevoked as exc:
+                current = await session.get(User, user.id)
+                if current is not None:
+                    await _mark_disconnected(session, current, str(exc))
+                    await session.commit()
+            except Exception:  # noqa: BLE001 - one user's calendar must not stop the rest
+                await session.rollback()
+                logger.exception("calendar sync failed for user %s", user.id)
+
+    await _beat("sync_calendars", f"synced {synced}, skipped {skipped}")
+    return {"users_synced": synced, "users_skipped": skipped}
+
+
 class WorkerSettings:
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
-    functions = [tick, renew_watches, reconcile, notify_due]
+    functions = [tick, renew_watches, reconcile, notify_due, sync_calendars]
     cron_jobs = [
         # Often enough that a due send goes out promptly, rarely enough that
         # an idle instance is not spinning.
@@ -267,6 +333,9 @@ class WorkerSettings:
         # Low frequency by design: it is the backstop, not the mechanism.
         cron(reconcile, hour={1, 7, 13, 19}, minute=30),
         cron(notify_due, hour=8, minute=0),
+        # Every five minutes: prompt enough that a reminder tracks a reschedule
+        # or a reply without being the source of truth for either.
+        cron(sync_calendars, minute=set(range(0, 60, 5))),
     ]
     max_jobs = 5
     job_timeout = 300

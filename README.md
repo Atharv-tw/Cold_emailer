@@ -24,7 +24,17 @@ blasts. The limits below are not a setting; they are the product.
   a sequence when someone replies. Out-of-office replies defer instead of
   killing the sequence.
 - **Reminds about follow-ups.** Dashboard due lists and web push notifications
-  surface follow-ups that need writing.
+  surface follow-ups that need writing, and - if you connect the optional
+  calendar scope - each scheduled follow-up is mirrored onto your Google
+  Calendar and moved or removed as the sequence changes.
+- **Imports a list.** Upload a CSV or Excel export, map the columns, and review
+  a per-row verdict - duplicates, suppressed contacts, invalid emails, and rows
+  still missing a hook - before importing only the ones that pass. Every
+  imported row goes through the same gates as adding one by hand.
+- **Shows how it is going.** A workflow dashboard with a bucket per status,
+  filters and search over everyone, reply/bounce/opt-out analytics by target
+  type, and an operational-health view of the worker, Gmail watch, and any
+  failed sends.
 
 ## Limits
 
@@ -60,26 +70,21 @@ packages/core     Scheduling, limits, threading, reply classification.
 infra             docker-compose for Postgres and Redis.
 ```
 
-Setup, architecture notes, and the phased roadmap are in
-[DEVELOPMENT.md](DEVELOPMENT.md).
+Setup and architecture notes are in [DEVELOPMENT.md](DEVELOPMENT.md); the
+production checklist is in [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Current status
 
-Built now:
+All four build phases have shipped:
 
 - Google sign-in and Gmail token storage
 - profile and resume extraction
 - target creation with categorization and verification
-- selectable generation templates
-- project metadata for better evidence/link selection
+- selectable generation templates and project metadata for evidence/link choice
 - draft generation, editing, send-now, and scheduled sending
 - threaded follow-ups with hard caps
 - Gmail reply tracking through push, renewal, and reconcile sweeps
-- web push and dashboard reminders for due follow-ups
-
-Remaining phases:
-
-1. Template/evidence control and docs alignment - in progress.
-2. Target import and workflow dashboard improvements.
-3. Calendar reminders and reminder sync lifecycle.
-4. Analytics, polish, and production hardening.
+- web push and dashboard reminders, plus optional Google Calendar sync
+- CSV/XLSX import with a review-before-save preview
+- workflow dashboard with status buckets, filters, and search
+- reply/bounce/opt-out analytics and an operational-health view
