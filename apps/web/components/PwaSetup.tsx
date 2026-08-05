@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { savePushSubscription } from "@/app/dashboard/actions";
+import { savePushSubscription } from "@/app/desktop/dashboard/actions";
 
 /**
  * Registers the service worker, offers installation, and offers notifications.
