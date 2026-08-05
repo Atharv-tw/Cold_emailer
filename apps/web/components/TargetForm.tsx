@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { createTarget } from "@/app/dashboard/actions";
+import { createTarget } from "@/app/desktop/dashboard/actions";
 
 /**
  * Adding someone.

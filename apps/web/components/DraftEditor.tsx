@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { generateDraft, saveDraft, scheduleSend, sendNow } from "@/app/dashboard/actions";
+import { generateDraft, saveDraft, scheduleSend, sendNow } from "@/app/desktop/dashboard/actions";
 import type { Draft, EmailTemplate, Target } from "@/lib/types";
 
 /**

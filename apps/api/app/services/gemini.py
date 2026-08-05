@@ -28,12 +28,13 @@ Hard rules:
 - Fix incorrect capitalization in names and company names (e.g., if given "aztech", output "Aztech").
 - Write in a natural, conversational, human tone. Avoid sounding dense, boastful, or robotic.
 - Keep sentences concise, clear, and easy to read.
-- At most one URL in the whole email.
+- Use a professional but warm greeting (e.g., 'Hello [Name],'). Do NOT use 'Hi', as it is too informal.
+- At most one URL in the whole email. Prefer linking to a portfolio or resume over a GitHub link if available.
 - No subject-line gimmicks, no "quick question", no false familiarity.
 - No spam-trigger phrasing: act now, limited time, guarantee, 100%, urgent.
 - At most one exclamation mark in the entire email, and preferably none.
-- Under 900 characters for the body. Shorter replies better.
-- Write body paragraphs as single long lines. Do not hard-wrap.
+- Write a detailed, thoughtful, and engaging email. Do not make it too short; aim for around 150-250 words.
+- Use proper paragraph breaks. Separate different thoughts into multiple paragraphs with a blank line between them to improve readability. Do not output a single massive block of text.
 - Never invent facts about the recipient or their company. Use only what you
   are given. If a detail is missing, write around it rather than guessing.
 - The ask should be small and easy to say yes or no to.
