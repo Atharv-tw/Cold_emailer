@@ -24,7 +24,7 @@ export function middleware(request: NextRequest) {
   return NextResponse.rewrite(url);
 }
 
-// Only run this middleware on pages. Exclude API, _next/static, _next/image, favicon, etc.
+// Only run this middleware on pages. Exclude API, _next/static, _next/image, favicon, static assets, etc.
 export const config = {
   matcher: [
     /*
@@ -32,8 +32,9 @@ export const config = {
      * - api (API routes)
      * - _next/static (static files)
      * - _next/image (image optimization files)
-     * - favicon.ico, sitemap.xml, robots.txt (metadata files)
+     * - favicon.ico, sitemap.xml, robots.txt, manifest.webmanifest (metadata files)
+     * - sw.js, *.png (public assets)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|manifest.webmanifest|sw.js|.*\\.png).*)',
   ],
 };
