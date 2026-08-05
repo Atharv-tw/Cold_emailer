@@ -8,7 +8,7 @@ import {
   saveProfile,
   saveProjects,
   uploadResume,
-} from "@/app/profile/actions";
+} from "@/app/desktop/profile/actions";
 import type { Disclosure, Profile, Project, Experience } from "@/lib/types";
 
 /**
