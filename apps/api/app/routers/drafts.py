@@ -16,7 +16,7 @@ from sqlalchemy import select
 from outreach_core.limits import MAX_TOUCHES, may_schedule_touch
 from outreach_core.templating import lint
 
-from ..deps import CurrentUser, Db, SettingsDep
+from ..deps import CurrentUser, Db, GeminiKey, SettingsDep
 from ..models import Message, Profile, ProfileExperience, ProfileProject, Target
 from ..services.gemini import AIError, GeminiClient
 from ..services.generation import generate
@@ -103,13 +103,14 @@ async def generate_draft(
     user: CurrentUser,
     session: Db,
     settings: SettingsDep,
+    gemini_key: GeminiKey,
 ) -> DraftOut:
     target, profile, projects, experience = await _load(session, user.id, target_id)
     step = target.touches_sent + 1
     thread = await _sent_thread(session, target.id)
 
     client = GeminiClient(
-        api_key=settings.gemini_api_key,
+        api_key=gemini_key,
         model=settings.gemini_model,
         endpoint=settings.gemini_endpoint,
     )

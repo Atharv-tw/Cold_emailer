@@ -15,6 +15,7 @@ the database and no email is sent.
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import sys
 from pathlib import Path
@@ -45,13 +46,15 @@ BSc Computer Science, University of Somewhere, 2022
 """
 
 
-async def check_gemini(settings) -> bool:
-    if not settings.gemini_api_key:
-        print(f"{SKIP}gemini      GEMINI_API_KEY is not set")
+async def check_gemini(settings, api_key: str | None) -> bool:
+    # Gemini is BYOK: the server holds no key of its own, so there is nothing
+    # to smoke-test unless one is passed on the command line for this check.
+    if not api_key:
+        print(f"{SKIP}gemini      BYOK - pass a key with --gemini-key to smoke-test it")
         return True
 
     client = GeminiClient(
-        api_key=settings.gemini_api_key,
+        api_key=api_key,
         model=settings.gemini_model,
         endpoint=settings.gemini_endpoint,
     )
@@ -110,12 +113,16 @@ async def check_dns() -> bool:
 
 
 async def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--gemini-key", default="", help="Key to smoke-test - Gemini has no server-side key anymore")
+    args = parser.parse_args()
+
     settings = get_settings()
     print(f"\nreading {ROOT / '.env'}\n")
 
     results = [
         await check_dns(),
-        await check_gemini(settings),
+        await check_gemini(settings, args.gemini_key),
         await check_verifier(settings),
     ]
 

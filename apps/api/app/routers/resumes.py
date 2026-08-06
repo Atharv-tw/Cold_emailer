@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 from sqlalchemy import delete, select
 
-from ..deps import CurrentUser, Db, SettingsDep
+from ..deps import CurrentUser, Db, GeminiKey, SettingsDep
 from ..models import Resume
 from ..schemas import ExperienceIn, ParsedResumeOut, ProjectIn, ResumeOut
 from ..services.gemini import AIError, GeminiClient
@@ -49,6 +49,7 @@ async def upload_resume(
     user: CurrentUser,
     session: Db,
     settings: SettingsDep,
+    gemini_key: GeminiKey,
     file: UploadFile = File(...),
     keep_original: bool = Form(False),
 ) -> ParsedResumeOut:
@@ -69,7 +70,7 @@ async def upload_resume(
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "could not store the file") from exc
 
     client = GeminiClient(
-        api_key=settings.gemini_api_key,
+        api_key=gemini_key,
         model=settings.gemini_model,
         endpoint=settings.gemini_endpoint,
     )

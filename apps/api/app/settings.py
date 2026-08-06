@@ -75,7 +75,9 @@ class Settings(BaseSettings):
         "https://api.quickemailverification.com/v1/verify"
     )
 
-    gemini_api_key: str = ""
+    # No server-side Gemini key: every AI call is billed to the caller's own
+    # key, supplied per-request (see `deps.gemini_api_key`). Model/endpoint
+    # stay server-controlled since they're not part of what BYOK covers.
     # 3.6 Flash went GA on 2026-07-21. `generateContent` is explicitly still
     # fully supported for it - the newer Interactions API is recommended for
     # new projects but is not a requirement, and moving to it would change the

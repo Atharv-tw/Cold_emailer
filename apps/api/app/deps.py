@@ -60,3 +60,22 @@ async def current_user(
 CurrentUser = Annotated[User, Depends(current_user)]
 CurrentUserId = Annotated[uuid.UUID, Depends(current_user_id)]
 Db = Annotated[AsyncSession, Depends(db)]
+
+
+async def gemini_api_key(
+    x_gemini_api_key: Annotated[str | None, Header(alias="X-Gemini-Api-Key")] = None,
+) -> str:
+    """Every AI call is billed to the user's own key, not a server one.
+
+    There is no server-side fallback: a missing key is a 422 the caller can
+    act on, not a silent use of someone else's quota.
+    """
+    if not x_gemini_api_key or not x_gemini_api_key.strip():
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "Add your Gemini API key in Settings to use AI features.",
+        )
+    return x_gemini_api_key.strip()
+
+
+GeminiKey = Annotated[str, Depends(gemini_api_key)]

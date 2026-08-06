@@ -155,8 +155,8 @@ class GeminiClient:
     async def _post(self, payload: dict[str, Any]) -> dict[str, Any]:
         if not self.api_key:
             raise AIError(
-                "No Gemini API key is configured, so nothing can be generated. "
-                "Set GEMINI_API_KEY - get one at https://aistudio.google.com/apikey"
+                "No Gemini API key was provided, so nothing can be generated. "
+                "Add your key in Settings - get one at https://aistudio.google.com/apikey"
             )
         try:
             async with httpx.AsyncClient(
