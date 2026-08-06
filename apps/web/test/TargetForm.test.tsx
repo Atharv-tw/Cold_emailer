@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const createTarget = vi.fn();
-vi.mock("@/app/dashboard/actions", () => ({
+vi.mock("@/app/desktop/(app)/dashboard/actions", () => ({
   createTarget: (...args: unknown[]) => createTarget(...args),
 }));
 

@@ -3,7 +3,11 @@
 import { revalidatePath } from "next/cache";
 
 import { api } from "@/lib/api";
-import type { Draft, SendResult, Target } from "@/lib/types";
+import type { Draft, ScheduledOut, SendResult, Target } from "@/lib/types";
+
+export async function getScheduled(): Promise<ScheduledOut> {
+  return api<ScheduledOut>("/v1/dashboard/scheduled");
+}
 
 export async function savePushSubscription(subscription: {
   endpoint: string;
@@ -43,10 +47,15 @@ export async function generateDraft(
   id: string,
   instruction: string,
   templateKey: string,
+  geminiKey: string,
 ): Promise<Draft> {
+  if (!geminiKey.trim()) {
+    throw new Error("Add your Gemini API key in Settings to use AI features.");
+  }
   return api<Draft>(`/v1/targets/${id}/draft`, {
     method: "POST",
     body: JSON.stringify({ instruction, template_key: templateKey }),
+    headers: { "X-Gemini-Api-Key": geminiKey.trim() },
   });
 }
 
