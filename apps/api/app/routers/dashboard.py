@@ -49,12 +49,39 @@ class TargetSummary(BaseModel):
     last_touch_at: datetime | None = None
 
 
+class SentByDay(BaseModel):
+    date: str
+    count: int
+
+
+class ReplyItem(BaseModel):
+    target_id: str
+    name: str
+    company: str
+    at: datetime
+
+
 class DashboardOut(BaseModel):
     counts: dict[str, int]
     due: list[DueItem]
     recent: list[TimelineEntry]
     targets: list[TargetSummary]
     suppressed: int
+    sent_by_day: list[SentByDay]
+    replies: list[ReplyItem]
+
+
+class ScheduledItem(BaseModel):
+    target_id: str
+    name: str
+    email: str
+    company: str
+    step: int
+    due_at: datetime
+
+
+class ScheduledOut(BaseModel):
+    items: list[ScheduledItem]
 
 
 class ThreadMessage(BaseModel):
@@ -172,6 +199,47 @@ async def dashboard(user: CurrentUser, session: Db) -> DashboardOut:
         or 0
     )
 
+    # 30-day send trend, zero-filled - the API groups by day but leaves gaps
+    # for days nothing sent, and the dashboard tile shouldn't have to guess.
+    since = now - timedelta(days=29)
+    sent_rows = (
+        await session.execute(
+            select(func.date(Message.sent_at), func.count(Message.id))
+            .where(
+                Message.user_id == user.id,
+                Message.status == "sent",
+                Message.sent_at >= since,
+            )
+            .group_by(func.date(Message.sent_at))
+        )
+    ).all()
+    sent_by_day_map = {str(day): count for day, count in sent_rows}
+    sent_by_day = [
+        SentByDay(date=str(day), count=sent_by_day_map.get(str(day), 0))
+        for day in (
+            (now - timedelta(days=offset)).date() for offset in range(29, -1, -1)
+        )
+    ]
+
+    reply_events = list(
+        await session.scalars(
+            select(Event)
+            .where(Event.user_id == user.id, Event.type == "replied")
+            .order_by(Event.at.desc())
+            .limit(10)
+        )
+    )
+    replies: list[ReplyItem] = []
+    for event in reply_events:
+        if event.target_id is None:
+            continue
+        target = await session.get(Target, event.target_id)
+        if target is None:
+            continue
+        replies.append(
+            ReplyItem(target_id=str(target.id), name=target.name, company=target.company, at=event.at)
+        )
+
     return DashboardOut(
         counts={
             "sent": sent_total,
@@ -188,7 +256,38 @@ async def dashboard(user: CurrentUser, session: Db) -> DashboardOut:
         recent=recent,
         targets=targets,
         suppressed=suppressed,
+        sent_by_day=sent_by_day,
+        replies=replies,
     )
+
+
+@router.get("/dashboard/scheduled", response_model=ScheduledOut)
+async def dashboard_scheduled(user: CurrentUser, session: Db) -> ScheduledOut:
+    """The full pending follow-up queue, for the dashboard's scheduled-sends
+    modal. `/dashboard` itself only carries the next-24h slice of this."""
+    rows = list(
+        await session.scalars(
+            select(ScheduleRow)
+            .where(ScheduleRow.user_id == user.id, ScheduleRow.state == "pending")
+            .order_by(ScheduleRow.due_at)
+        )
+    )
+    items: list[ScheduledItem] = []
+    for row in rows:
+        target = await session.get(Target, row.target_id)
+        if target is None:
+            continue
+        items.append(
+            ScheduledItem(
+                target_id=str(target.id),
+                name=target.name,
+                email=target.email,
+                company=target.company,
+                step=row.step,
+                due_at=row.due_at,
+            )
+        )
+    return ScheduledOut(items=items)
 
 
 @router.get("/targets/{target_id}/timeline", response_model=TargetDetail)
