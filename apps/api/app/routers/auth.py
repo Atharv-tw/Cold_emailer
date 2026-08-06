@@ -20,6 +20,7 @@ from ..db import SessionFactory, bind_user
 from ..deps import CurrentUser, Db, SettingsDep
 from ..models import GoogleToken, Profile, User
 from ..security import COOKIE_NAME, issue_session
+from ..settings import Settings
 from ..services.google_oauth import (
     GoogleAuthError,
     has_calendar_scope,
@@ -55,17 +56,23 @@ class SessionOut(BaseModel):
 
 def _session_out(
     user: User,
+    settings: Settings,
     *,
     connected: bool,
     missing: list[str],
     profile: Profile | None,
     scopes: list[str] | None = None,
 ) -> SessionOut:
+    avatar = (
+        f"{settings.api_base_url}/v1/profile/avatar/{user.id}"
+        if user.avatar_override
+        else user.avatar
+    )
     return SessionOut(
         id=str(user.id),
         email=user.email,
         name=user.name,
-        avatar=user.avatar,
+        avatar=avatar,
         connected=connected,
         missing_scopes=missing,
         profile_complete=bool(profile and profile.headline and profile.bio),
@@ -164,6 +171,7 @@ async def sign_in_with_google(
         scopes = payload.scopes or (token_row.scopes if token_row else [])
         return _session_out(
             user,
+            settings,
             connected=token_row is not None,
             missing=missing_scopes(scopes),
             profile=profile,
@@ -172,11 +180,12 @@ async def sign_in_with_google(
 
 
 @router.get("/me", response_model=SessionOut)
-async def me(user: CurrentUser, session: Db) -> SessionOut:
+async def me(user: CurrentUser, session: Db, settings: SettingsDep) -> SessionOut:
     token_row = await session.scalar(select(GoogleToken).where(GoogleToken.user_id == user.id))
     profile = await session.scalar(select(Profile).where(Profile.user_id == user.id))
     return _session_out(
         user,
+        settings,
         connected=token_row is not None and user.disconnected_at is None,
         missing=missing_scopes(token_row.scopes if token_row else []),
         profile=profile,

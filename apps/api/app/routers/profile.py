@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, status
+import mimetypes
+import uuid
+
+from fastapi import APIRouter, File, HTTPException, UploadFile, status
+from fastapi.responses import Response
+from pydantic import BaseModel
 from sqlalchemy import delete, select
 
+from ..db import session_for
 from ..deps import CurrentUser, Db, SettingsDep
-from ..models import Profile, ProfileExperience, ProfileProject, Resume
+from ..models import Profile, ProfileExperience, ProfileProject, Resume, User
 from ..schemas import (
     CompletenessOut,
     ExperienceIn,
@@ -15,9 +21,12 @@ from ..schemas import (
     ProjectIn,
 )
 from ..services.completeness import assess
-from ..services.storage import LocalStorage
+from ..services.storage import LocalStorage, StorageError
 
 router = APIRouter(prefix="/v1/profile", tags=["profile"])
+
+AVATAR_TYPES = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
+MAX_AVATAR_BYTES = 5 * 1024 * 1024
 
 
 async def _load(session, user_id) -> tuple[Profile, list[ProfileProject], list[ProfileExperience]]:
@@ -119,6 +128,70 @@ async def update_profile(payload: ProfileIn, user: CurrentUser, session: Db) -> 
 
     await session.commit()
     return _out(profile, projects, experience)
+
+
+class AvatarOut(BaseModel):
+    avatar_url: str
+
+
+def _avatar_url(settings, user_id: uuid.UUID) -> str:
+    return f"{settings.api_base_url}/v1/profile/avatar/{user_id}"
+
+
+@router.post("/avatar", response_model=AvatarOut)
+async def upload_avatar(
+    user: CurrentUser, session: Db, settings: SettingsDep, file: UploadFile = File(...)
+) -> AvatarOut:
+    ext = AVATAR_TYPES.get((file.content_type or "").lower())
+    if ext is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Upload a JPEG, PNG or WEBP image.")
+
+    data = await file.read()
+    if len(data) > MAX_AVATAR_BYTES:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "That image is too large (max 5MB).")
+
+    storage = LocalStorage(settings.storage_dir)
+    old_key = user.avatar_override
+    key = storage.key_for(user.id, f"avatar{ext}", allowed=tuple(AVATAR_TYPES.values()))
+    storage.put(key, data)
+
+    user.avatar_override = key
+    await session.commit()
+
+    # Delete the old file only after the new one is safely committed, so a
+    # failure partway through never leaves the user with neither.
+    if old_key:
+        storage.delete(old_key)
+
+    return AvatarOut(avatar_url=_avatar_url(settings, user.id))
+
+
+@router.delete("/avatar", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_avatar(user: CurrentUser, session: Db, settings: SettingsDep) -> None:
+    if user.avatar_override:
+        LocalStorage(settings.storage_dir).delete(user.avatar_override)
+        user.avatar_override = ""
+        await session.commit()
+
+
+@router.get("/avatar/{user_id}", include_in_schema=False)
+async def get_avatar(user_id: uuid.UUID, settings: SettingsDep) -> Response:
+    """Public and unauthenticated on purpose: an `<img src>` tag cannot carry
+    a bearer token, and a chosen profile photo isn't sensitive the way a
+    resume is. The id is a random UUID, so this is unguessable, not merely
+    unlinked."""
+    async with session_for(user_id) as session:
+        user = await session.scalar(select(User).where(User.id == user_id))
+
+    if user is None or not user.avatar_override:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no avatar")
+    try:
+        data = LocalStorage(settings.storage_dir).get(user.avatar_override)
+    except StorageError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no avatar") from exc
+
+    media_type = mimetypes.guess_type(user.avatar_override)[0] or "application/octet-stream"
+    return Response(content=data, media_type=media_type)
 
 
 @router.put("/projects", response_model=ProfileOut)

@@ -33,9 +33,14 @@ class LocalStorage:
             raise StorageError("refusing a key that escapes the storage root")
         return path
 
-    def key_for(self, user_id: uuid.UUID, filename: str) -> str:
+    def key_for(
+        self,
+        user_id: uuid.UUID,
+        filename: str,
+        allowed: tuple[str, ...] = (".pdf", ".docx"),
+    ) -> str:
         suffix = Path(filename).suffix.lower()
-        if suffix not in (".pdf", ".docx"):
+        if suffix not in allowed:
             suffix = ""
         return f"{user_id}/{uuid.uuid4().hex}{suffix}"
 

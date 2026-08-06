@@ -57,6 +57,9 @@ class User(Base, TimestampMixin):
     email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(255), default="")
     avatar: Mapped[str] = mapped_column(Text, default="")
+    # A storage key, not a URL - set when the user uploads their own photo.
+    # Empty means "use the Google picture in `avatar`" instead.
+    avatar_override: Mapped[str] = mapped_column(Text, default="")
 
     # Set when Google tells us the grant is gone - a revoked token fails
     # silently on the next send, so the state has to be recorded explicitly.
