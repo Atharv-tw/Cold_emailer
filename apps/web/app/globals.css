@@ -1,4 +1,25 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-accent: #1a5e42;
+  --color-accent-light: #e6f2eb;
+  --color-bg: #f4f6f8;
+  --color-surface: #ffffff;
+  --color-fg: #111827;
+  --color-muted: #6b7280;
+  --color-line: #f3f4f6;
+  --color-danger: #ef4444;
+  --color-danger-light: #fef2f2;
+  --color-warning: #f59e0b;
+  --color-warning-light: #fffbeb;
+
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1.25rem;
+
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+}
 
 :root {
   color-scheme: light;
@@ -97,122 +118,7 @@ button.danger:hover {
   opacity: 0.9;
 }
 
-/* Layout */
-.app-layout {
-  display: grid;
-  grid-template-columns: 260px 1fr;
-  min-height: 100vh;
-}
-
-/* Sidebar */
-.sidebar {
-  background: var(--surface);
-  padding: 2rem 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-  border-right: 1px solid var(--line);
-}
-
-.sidebar-logo {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--accent);
-}
-
-.nav-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.nav-label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  border-radius: var(--radius-md);
-  color: var(--muted);
-  font-weight: 500;
-  transition: all 0.2s;
-}
-
-.nav-item:hover {
-  background: #f9fafb;
-  color: var(--fg);
-}
-
-.nav-item.active {
-  background: var(--accent-light);
-  color: var(--accent);
-  position: relative;
-}
-
-.nav-item.active::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  height: 24px;
-  width: 4px;
-  background: var(--accent);
-  border-radius: 0 4px 4px 0;
-}
-
-/* Topbar */
-.topbar {
-  height: 80px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 2.5rem;
-  background: var(--bg);
-}
-
-.search-bar {
-  display: flex;
-  align-items: center;
-  background: var(--surface);
-  border-radius: 2rem;
-  padding: 0.75rem 1.25rem;
-  width: 400px;
-  gap: 0.5rem;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
-}
-.search-bar input {
-  border: none;
-  background: transparent;
-  outline: none;
-  width: 100%;
-  font-family: inherit;
-  font-size: 14px;
-}
-.search-shortcut {
-  background: #f3f4f6;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.topbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
+/* Topbar-scoped bits DesktopChrome still relies on for non-utility styling */
 .icon-btn {
   width: 40px;
   height: 40px;
@@ -367,34 +273,6 @@ button.danger:hover {
 .badge-completed { background: var(--accent-light); color: var(--accent); }
 .badge-pending { background: var(--warning-light); color: var(--warning); }
 .badge-danger { background: var(--danger-light); color: var(--danger); }
-
-/* Progress / Charts */
-.bar-chart-container {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  height: 120px;
-  margin-top: auto;
-  gap: 0.5rem;
-}
-.bar {
-  flex: 1;
-  border-radius: 1rem;
-  min-height: 20px;
-  transition: height 0.5s ease;
-}
-.bar.striped {
-  background: repeating-linear-gradient(
-    45deg,
-    #f3f4f6,
-    #f3f4f6 10px,
-    #ffffff 10px,
-    #ffffff 20px
-  );
-  border: 1px solid var(--line);
-}
-.bar.solid { background: var(--accent); }
-.bar.solid-light { background: #5db085; }
 
 /* Donut */
 .donut-container {
