@@ -1,48 +1,68 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { auth, signIn } from "@/auth";
+import { auth } from "@/auth";
+
+function Feature({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="rounded-2xl border border-line bg-surface p-4 text-left">
+      <h3 className="mb-1 text-fg">{title}</h3>
+      <p className="text-sm text-muted">{body}</p>
+    </div>
+  );
+}
 
 export default async function Home() {
   const session = await auth();
   if (session?.apiUser) redirect("/dashboard");
 
   return (
-    <main>
-      <h1>Cold outreach</h1>
-      <p>
-        Sign in with Google, add your resume, and add the people you want to
-        reach. The email gets written for you; nothing sends until you press
-        send.
-      </p>
+    <main className="flex min-h-screen flex-col bg-bg">
+      <header className="flex items-center justify-between px-8 py-6 sm:px-16">
+        <div className="flex items-center gap-2 text-xl font-bold text-accent">
+          <span className="text-2xl">◎</span> Outreach
+        </div>
+        <Link href="/login">
+          <button className="secondary">Sign in</button>
+        </Link>
+      </header>
 
-      <form
-        action={async () => {
-          "use server";
-          await signIn("google", { redirectTo: "/dashboard" });
-        }}
-      >
-        <button type="submit">Continue with Google</button>
-      </form>
+      <section className="mx-auto flex max-w-2xl flex-1 flex-col items-center justify-center gap-6 px-6 py-16 text-center">
+        <h1 className="text-4xl font-bold tracking-tight text-fg sm:text-5xl">
+          Cold outreach that sounds like <span className="text-accent">you</span>.
+        </h1>
+        <p className="text-lg text-muted">
+          Sign in with Google, add your resume, and add the people you want to reach. The email
+          gets written for you from what you actually did — nothing sends until you press send.
+        </p>
+        <Link href="/login">
+          <button
+            className="primary"
+            style={{ borderRadius: "2rem", padding: "0.75rem 2rem", fontSize: "16px" }}
+          >
+            Get started
+          </button>
+        </Link>
 
-      <div className="note">
-        <strong>You will see an &ldquo;unverified app&rdquo; warning.</strong>{" "}
-        That is expected while the Google consent screen is in testing mode, and
-        it is not a sign that something is wrong. It also means access is capped
-        at 100 accounts for now.
-      </div>
+        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <Feature
+            title="Drafted for you"
+            body="Emails are written from your resume and projects, not a template."
+          />
+          <Feature
+            title="You stay in control"
+            body="Nothing sends automatically. Review, edit, then press send."
+          />
+          <Feature
+            title="Tracks what happens"
+            body="Replies, bounces and follow-ups are tracked so nobody slips through."
+          />
+        </div>
+      </section>
 
-      <div className="note">
-        Getting <strong>&ldquo;Access blocked&rdquo;</strong> or{" "}
-        <code>Error 403: access_denied</code> instead? That account has not been
-        added as a tester yet, which is a separate list from the warning above.
-        Ask for an invite rather than retrying — nothing you do on this screen
-        will change it.
-      </div>
-
-      <div className="note">
-        Reading your inbox is what stops the tool emailing someone who already
-        replied. It only ever looks at threads it started.
-      </div>
+      <footer className="px-8 py-6 text-center text-xs text-muted">
+        Built for people doing their own outreach.
+      </footer>
     </main>
   );
 }
