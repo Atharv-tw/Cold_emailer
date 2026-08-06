@@ -6,7 +6,7 @@ import type { ImportPreview } from "@/lib/types";
 
 const previewImport = vi.fn();
 const commitImport = vi.fn();
-vi.mock("@/app/import/actions", () => ({
+vi.mock("@/app/desktop/(app)/targets/import-actions", () => ({
   previewImport: (...args: unknown[]) => previewImport(...args),
   commitImport: (...args: unknown[]) => commitImport(...args),
 }));

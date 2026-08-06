@@ -1,17 +1,33 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
-import { auth } from "@/auth";
+import Avatar from "@/components/Avatar";
+import ImportButton from "@/components/ImportButton";
 import TargetFilters from "@/components/TargetFilters";
 import { api } from "@/lib/api";
+import { requireAuth } from "@/lib/auth-guard";
 import type { Target } from "@/lib/types";
 
 type Search = Record<string, string | string[] | undefined>;
 
 const FACETS = ["status", "target_type", "company_type", "intent", "q"] as const;
 
+const STATUS_TONE: Record<string, string> = {
+  completed: "badge-completed",
+  replied: "badge-completed",
+  bounced: "badge-danger",
+  opted_out: "badge-danger",
+};
+
 function one(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
+}
+
+function relative(iso: string | null): string {
+  if (!iso) return "never contacted";
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  if (days <= 0) return "touched today";
+  if (days === 1) return "touched yesterday";
+  return `touched ${days}d ago`;
 }
 
 export default async function TargetsPage({
@@ -19,8 +35,7 @@ export default async function TargetsPage({
 }: {
   searchParams: Promise<Search>;
 }) {
-  const session = await auth();
-  if (!session?.apiUser) redirect("/");
+  await requireAuth();
 
   const params = await searchParams;
   const query = new URLSearchParams();
@@ -44,72 +59,72 @@ export default async function TargetsPage({
           </p>
         </div>
         <div className="header-actions">
-          <Link href="/import">
-            <button className="secondary" style={{ borderRadius: "2rem", padding: "0.5rem 1.25rem", fontWeight: "600" }}>
-              Import Data
-            </button>
-          </Link>
+          <ImportButton />
           <Link href="/targets/new">
-            <button className="primary" style={{ borderRadius: "2rem", padding: "0.5rem 1.25rem", fontWeight: "600" }}>
+            <button
+              className="primary"
+              style={{ borderRadius: "2rem", padding: "0.5rem 1.25rem", fontWeight: "600" }}
+            >
               + Add Contact
             </button>
           </Link>
         </div>
       </div>
 
-      <div className="dz-card" style={{ padding: "0", overflow: "hidden" }}>
-        <div style={{ padding: "1.5rem", borderBottom: "1px solid var(--line)", background: "#fcfcfc" }}>
-          <TargetFilters active={active} />
-        </div>
-
-        {targets.length === 0 ? (
-          <div style={{ padding: "4rem", textAlign: "center", color: "var(--muted)" }}>
-            <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>📭</div>
-            <h3>Nobody found</h3>
-            <p>Try adjusting your filters or adding a new contact.</p>
-          </div>
-        ) : (
-          <div className="table-scroll">
-            <table className="preview">
-              <thead style={{ background: "#fcfcfc" }}>
-                <tr>
-                  <th>Name</th>
-                  <th>Company</th>
-                  <th>Type</th>
-                  <th>Status</th>
-                  <th>Touches</th>
-                </tr>
-              </thead>
-              <tbody>
-                {targets.map((target) => (
-                  <tr key={target.id}>
-                    <td>
-                      <Link href={`/targets/${target.id}`} style={{ fontWeight: "600", color: "var(--fg)" }}>
-                        {target.name || target.email}
-                      </Link>
-                    </td>
-                    <td>{target.company || <span className="muted">—</span>}</td>
-                    <td className="muted">{target.target_type.replace(/_/g, " ")}</td>
-                    <td>
-                      <span className={`badge ${target.status === 'completed' ? 'badge-completed' : target.status === 'bounced' ? 'badge-danger' : 'badge-pending'}`}>
-                        {target.status}
-                      </span>
-                      {target.status_detail && (
-                        <span className="muted" style={{ fontSize: "12px", marginLeft: "0.5rem" }}>
-                          {target.status_detail}
-                        </span>
-                      )}
-                    </td>
-                    <td className="muted">
-                      {target.touches_sent}/{target.touches_sent + target.touches_remaining}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      <div className="dz-card">
+        <TargetFilters active={active} />
       </div>
+
+      {targets.length === 0 ? (
+        <div className="dz-card items-center py-16 text-center text-muted">
+          <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>📭</div>
+          <h3>Nobody found</h3>
+          <p>Try adjusting your filters or adding a new contact.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
+          {targets.map((target) => (
+            <Link
+              key={target.id}
+              href={`/targets/${target.id}`}
+              className="dz-card gap-3 transition-shadow hover:shadow-md"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-3">
+                  <Avatar name={target.name || target.email} />
+                  <div>
+                    <div className="font-semibold text-fg">{target.name || target.email}</div>
+                    <div className="text-xs text-muted">{target.role || "—"}</div>
+                  </div>
+                </div>
+                <span className={`badge ${STATUS_TONE[target.status] ?? "badge-pending"}`}>
+                  {target.status.replace(/_/g, " ")}
+                </span>
+              </div>
+
+              <div className="text-sm text-fg">{target.company || "—"}</div>
+
+              <div className="flex flex-wrap gap-1.5">
+                {target.target_type && (
+                  <span className="rounded-full bg-bg px-2.5 py-1 text-[11px] font-medium text-muted">
+                    {target.target_type.replace(/_/g, " ")}
+                  </span>
+                )}
+                {target.company_type && (
+                  <span className="rounded-full bg-bg px-2.5 py-1 text-[11px] font-medium text-muted">
+                    {target.company_type.replace(/_/g, " ")}
+                  </span>
+                )}
+              </div>
+
+              <div className="mt-auto text-xs text-muted">
+                {target.touches_sent} touch{target.touches_sent === 1 ? "" : "es"} ·{" "}
+                {relative(target.last_touch_at)}
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
     </>
   );
 }

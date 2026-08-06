@@ -9,6 +9,10 @@ import { useState } from "react";
  * The filters live in the URL, not in this component's state: the page is a
  * server component that reads the query string and asks the API, so a filtered
  * view is shareable and survives a reload. This only edits the URL.
+ *
+ * Each facet is single-select - the API only accepts one value per facet
+ * today (`status`, `target_type`, etc. are plain query params, not lists) -
+ * so these render as chip toggles rather than a multi-select control.
  */
 
 const STATUSES = [
@@ -52,6 +56,38 @@ const INTENTS = [
   ["feedback", "Advice / feedback"],
 ] as const;
 
+function ChipGroup({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: readonly (readonly [string, string])[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-muted">{label}</span>
+      {options.map(([optionValue, text]) => (
+        <button
+          key={optionValue}
+          type="button"
+          onClick={() => onChange(optionValue)}
+          className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+            value === optionValue
+              ? "border-accent bg-accent-light text-accent"
+              : "border-line bg-surface text-muted hover:text-fg"
+          }`}
+        >
+          {text}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function TargetFilters({ active }: { active: Record<string, string> }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -70,47 +106,9 @@ export default function TargetFilters({ active }: { active: Record<string, strin
   const anyActive = Object.values(active).some((value) => value && value.trim());
 
   return (
-    <section style={{ display: "flex", flexWrap: "wrap", gap: "1rem", alignItems: "center", justifyContent: "space-between" }}>
-      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-        <select
-          aria-label="Filter by status"
-          value={active.status ?? ""}
-          onChange={(e) => apply({ status: e.target.value })}
-        >
-          {STATUSES.map(([value, label]) => (
-            <option key={value} value={value}>{label}</option>
-          ))}
-        </select>
-        <select
-          aria-label="Filter by who they are"
-          value={active.target_type ?? ""}
-          onChange={(e) => apply({ target_type: e.target.value })}
-        >
-          {TARGET_TYPES.map(([value, label]) => (
-            <option key={value} value={value}>{label}</option>
-          ))}
-        </select>
-        <select
-          aria-label="Filter by company type"
-          value={active.company_type ?? ""}
-          onChange={(e) => apply({ company_type: e.target.value })}
-        >
-          {COMPANY_TYPES.map(([value, label]) => (
-            <option key={value} value={value}>{label}</option>
-          ))}
-        </select>
-        <select
-          aria-label="Filter by goal"
-          value={active.intent ?? ""}
-          onChange={(e) => apply({ intent: e.target.value })}
-        >
-          {INTENTS.map(([value, label]) => (
-            <option key={value} value={value}>{label}</option>
-          ))}
-        </select>
-      </div>
+    <div className="flex flex-col gap-3">
       <form
-        style={{ display: "flex", gap: "0.5rem" }}
+        className="flex gap-2"
         onSubmit={(event) => {
           event.preventDefault();
           apply({ q: search });
@@ -122,9 +120,11 @@ export default function TargetFilters({ active }: { active: Record<string, strin
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search name, company or email"
           aria-label="Search"
-          style={{ width: "250px" }}
+          className="flex-1"
         />
-        <button type="submit" className="primary">Search</button>
+        <button type="submit" className="primary">
+          Search
+        </button>
         {anyActive && (
           <button
             type="button"
@@ -138,6 +138,16 @@ export default function TargetFilters({ active }: { active: Record<string, strin
           </button>
         )}
       </form>
-    </section>
+
+      <ChipGroup label="Status" options={STATUSES} value={active.status ?? ""} onChange={(v) => apply({ status: v })} />
+      <ChipGroup label="Who" options={TARGET_TYPES} value={active.target_type ?? ""} onChange={(v) => apply({ target_type: v })} />
+      <ChipGroup
+        label="Company"
+        options={COMPANY_TYPES}
+        value={active.company_type ?? ""}
+        onChange={(v) => apply({ company_type: v })}
+      />
+      <ChipGroup label="Goal" options={INTENTS} value={active.intent ?? ""} onChange={(v) => apply({ intent: v })} />
+    </div>
   );
 }

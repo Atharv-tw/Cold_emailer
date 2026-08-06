@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 
-import { commitImport, previewImport } from "@/app/desktop/import/actions";
+import { commitImport, previewImport } from "@/app/desktop/(app)/targets/import-actions";
 import type {
   ImportCommitResult,
   ImportPreview,
