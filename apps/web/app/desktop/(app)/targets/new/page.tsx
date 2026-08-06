@@ -1,14 +1,12 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
-import { auth } from "@/auth";
 import TargetForm from "@/components/TargetForm";
 import { api } from "@/lib/api";
+import { requireAuth } from "@/lib/auth-guard";
 import type { Profile } from "@/lib/types";
 
 export default async function NewTargetPage() {
-  const session = await auth();
-  if (!session?.apiUser) redirect("/");
+  await requireAuth();
 
   const profile = await api<Profile>("/v1/profile");
 

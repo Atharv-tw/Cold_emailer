@@ -55,6 +55,19 @@ export type ParsedResume = {
 
 export type Disclosure = Record<string, string>;
 
+export type SessionUser = {
+  id: string;
+  email: string;
+  name: string;
+  avatar: string;
+  connected: boolean;
+  missing_scopes: string[];
+  profile_complete: boolean;
+  calendar_connected: boolean;
+};
+
+export type AvatarOut = { avatar_url: string };
+
 export type Verification = {
   status?: "deliverable" | "risky" | "undeliverable" | "unknown";
   reason?: string;
@@ -132,13 +145,30 @@ export type TargetSummary = {
   last_touch_at: string | null;
 };
 
+export type SentByDay = { date: string; count: number };
+
+export type ReplyItem = { target_id: string; name: string; company: string; at: string };
+
 export type Dashboard = {
   counts: Record<string, number>;
   due: DueItem[];
   recent: TimelineEntry[];
   targets: TargetSummary[];
   suppressed: number;
+  sent_by_day: SentByDay[];
+  replies: ReplyItem[];
 };
+
+export type ScheduledItem = {
+  target_id: string;
+  name: string;
+  email: string;
+  company: string;
+  step: number;
+  due_at: string;
+};
+
+export type ScheduledOut = { items: ScheduledItem[] };
 
 export type ImportField = { key: string; label: string; required: boolean };
 
@@ -226,6 +256,22 @@ export type Ops = {
   reconcile_last_read: string | null;
   follow_ups_due: number;
   failed_sends: OpsFailedSend[];
+};
+
+export type MessageOut = {
+  id: string;
+  target_id: string;
+  target_name: string;
+  target_company: string;
+  target_email: string;
+  step: number;
+  subject: string;
+  body: string;
+  status: string;
+  sent_at: string | null;
+  error: string;
+  is_reply: boolean;
+  is_undeliverable: boolean;
 };
 
 export type ThreadMessage = {

@@ -1,9 +1,8 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
-import { auth } from "@/auth";
 import DraftEditor from "@/components/DraftEditor";
 import { api } from "@/lib/api";
+import { requireAuth } from "@/lib/auth-guard";
 import type { Draft, EmailTemplate, Target, TargetDetail } from "@/lib/types";
 
 const VERIFICATION_TONE: Record<string, string> = {
@@ -18,8 +17,7 @@ export default async function TargetPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const session = await auth();
-  if (!session?.apiUser) redirect("/");
+  await requireAuth();
 
   const { id } = await params;
   const [target, detail, draft, templates] = await Promise.all([
