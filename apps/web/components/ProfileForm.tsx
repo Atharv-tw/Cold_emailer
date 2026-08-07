@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 
 import {
-  deleteMyData,
   removeAvatar,
   saveExperience,
   saveProfile,
@@ -67,12 +66,9 @@ export default function ProfileForm({ profile, disclosure, user }: Props) {
   const [status, setStatus] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [pending, startTransition] = useTransition();
-  const { key: geminiKey, setKey: setGeminiKey, hasKey: hasGeminiKey } = useGeminiKey();
-  const [geminiDraft, setGeminiDraft] = useState(geminiKey);
+  const { key: geminiKey, hasKey: hasGeminiKey } = useGeminiKey();
   const [avatarPreview, setAvatarPreview] = useState(user.avatar);
   const [avatarPending, startAvatarTransition] = useTransition();
-
-  useEffect(() => setGeminiDraft(geminiKey), [geminiKey]);
 
   function claim(field: string) {
     setExtracted((current) => {
@@ -227,43 +223,23 @@ export default function ProfileForm({ profile, disclosure, user }: Props) {
         </div>
       </section>
 
-      <section>
-        <h2>AI</h2>
-        <label>
-          Gemini API key
-          <input
-            type="password"
-            value={geminiDraft}
-            onChange={(event) => setGeminiDraft(event.target.value)}
-            placeholder="AIza…"
-          />
-        </label>
-        <div className="flex gap-2">
-          <button type="button" className="secondary" onClick={() => setGeminiKey(geminiDraft)}>
-            Save key
-          </button>
-          {hasGeminiKey && (
-            <button
-              type="button"
-              className="quiet"
-              onClick={() => {
-                setGeminiKey("");
-                setGeminiDraft("");
-              }}
-            >
-              Clear
-            </button>
-          )}
-        </div>
-        <p className="muted" style={{ fontSize: "12px" }}>
-          Powers drafting and resume reading. Kept only in this browser tab — never sent anywhere
-          but the API, and gone the moment you close the tab. Get a free key at{" "}
-          <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">
-            aistudio.google.com/apikey
-          </a>
-          .
-        </p>
-      </section>
+      {!hasGeminiKey && (
+        <section
+          className="rounded-xl border p-4"
+          style={{ borderColor: "var(--warning)", background: "var(--warning-light)" }}
+        >
+          <p style={{ color: "var(--warning)", fontWeight: 600, marginBottom: "0.25rem" }}>
+            ⚠️ No Gemini API key set
+          </p>
+          <p className="muted" style={{ fontSize: "13px" }}>
+            Reading a resume needs your Gemini key. Add one in{" "}
+            <a href="/settings" style={{ textDecoration: "underline", color: "var(--warning)" }}>
+              Settings
+            </a>{" "}
+            first.
+          </p>
+        </section>
+      )}
 
       <section>
         <h2>Upload a resume</h2>
@@ -280,7 +256,9 @@ export default function ProfileForm({ profile, disclosure, user }: Props) {
           <label>
             <input type="checkbox" name="keep_original" /> Keep the original file
           </label>
-          <button type="submit">Read it</button>
+          <button type="submit" disabled={!hasGeminiKey}>
+            Read it
+          </button>
         </form>
 
         <p className="muted">
@@ -537,34 +515,6 @@ export default function ProfileForm({ profile, disclosure, user }: Props) {
       <section>
         <button type="button" onClick={onSave} disabled={pending}>
           {pending ? "Saving…" : "Save profile"}
-        </button>
-      </section>
-
-      <section>
-        <h2>Your data</h2>
-        <p className="muted">
-          Deletes every resume you have uploaded and everything extracted from
-          one, files included. It cannot be undone.
-        </p>
-        <button
-          type="button"
-          className="danger"
-          onClick={() => {
-            if (!confirm("Delete every resume and everything extracted from one?")) return;
-            startTransition(async () => {
-              await deleteMyData();
-              setHeadline("");
-              setBio("");
-              setEducation("");
-              setLinks({ portfolio: "", resume: "", linkedin: "", github: "", other: "" });
-              setProjects([]);
-              setExperience([]);
-              setExtracted(new Set());
-              setStatus("Deleted.");
-            });
-          }}
-        >
-          Delete my resume and parsed data
         </button>
       </section>
 

@@ -16,7 +16,7 @@ export default async function ProfilePage() {
     <>
       <div className="page-header">
         <div>
-          <h1 style={{ fontSize: "28px", fontWeight: "700" }}>Settings</h1>
+          <h1 style={{ fontSize: "28px", fontWeight: "700" }}>Profile</h1>
           <p style={{ marginTop: "0.25rem", color: "var(--muted)" }}>
             This is what your emails get written from. The more specific it is, the less the mail
             reads like a template.

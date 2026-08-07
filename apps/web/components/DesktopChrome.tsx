@@ -19,7 +19,8 @@ const NAV_ITEMS = [
 ];
 
 const GENERAL_ITEMS = [
-  { label: "Settings", href: "/profile", icon: "⚙️" },
+  { label: "Profile", href: "/profile", icon: "🙂" },
+  { label: "Settings", href: "/settings", icon: "⚙️" },
   { label: "Help", href: "/help", icon: "❔" },
 ];
 
@@ -131,6 +132,13 @@ export default function DesktopChrome({
               >
                 <Link
                   href="/profile"
+                  className="block rounded-lg px-3 py-2 text-sm font-medium text-fg hover:bg-bg"
+                  onClick={() => setProfileOpen(false)}
+                >
+                  Profile
+                </Link>
+                <Link
+                  href="/settings"
                   className="block rounded-lg px-3 py-2 text-sm font-medium text-fg hover:bg-bg"
                   onClick={() => setProfileOpen(false)}
                 >
