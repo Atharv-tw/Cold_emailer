@@ -56,7 +56,7 @@ const INTENTS = [
   ["feedback", "Advice / feedback"],
 ] as const;
 
-function ChipGroup({
+function SelectGroup({
   label,
   options,
   value,
@@ -68,22 +68,19 @@ function ChipGroup({
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-muted">{label}</span>
-      {options.map(([optionValue, text]) => (
-        <button
-          key={optionValue}
-          type="button"
-          onClick={() => onChange(optionValue)}
-          className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-            value === optionValue
-              ? "border-accent bg-accent-light text-accent"
-              : "border-line bg-surface text-muted hover:text-fg"
-          }`}
-        >
-          {text}
-        </button>
-      ))}
+    <div className="flex items-center gap-2">
+      <span className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="rounded border border-line bg-surface px-2 py-1 text-sm text-fg outline-none focus:border-accent"
+      >
+        {options.map(([optionValue, text]) => (
+          <option key={optionValue} value={optionValue}>
+            {text}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
@@ -139,15 +136,17 @@ export default function TargetFilters({ active }: { active: Record<string, strin
         )}
       </form>
 
-      <ChipGroup label="Status" options={STATUSES} value={active.status ?? ""} onChange={(v) => apply({ status: v })} />
-      <ChipGroup label="Who" options={TARGET_TYPES} value={active.target_type ?? ""} onChange={(v) => apply({ target_type: v })} />
-      <ChipGroup
-        label="Company"
-        options={COMPANY_TYPES}
-        value={active.company_type ?? ""}
-        onChange={(v) => apply({ company_type: v })}
-      />
-      <ChipGroup label="Goal" options={INTENTS} value={active.intent ?? ""} onChange={(v) => apply({ intent: v })} />
+      <div className="flex flex-wrap items-center gap-4 pt-2">
+        <SelectGroup label="Status" options={STATUSES} value={active.status ?? ""} onChange={(v) => apply({ status: v })} />
+        <SelectGroup label="Who" options={TARGET_TYPES} value={active.target_type ?? ""} onChange={(v) => apply({ target_type: v })} />
+        <SelectGroup
+          label="Company"
+          options={COMPANY_TYPES}
+          value={active.company_type ?? ""}
+          onChange={(v) => apply({ company_type: v })}
+        />
+        <SelectGroup label="Goal" options={INTENTS} value={active.intent ?? ""} onChange={(v) => apply({ intent: v })} />
+      </div>
     </div>
   );
 }
