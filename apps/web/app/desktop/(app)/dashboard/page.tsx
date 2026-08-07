@@ -79,15 +79,15 @@ export default async function DashboardPage() {
 
       {/* Row 1: replies / sent trend / total contacts */}
       <div className="grid grid-cols-4 gap-5">
-        <div className="dz-card">
+        <div className="dz-card bg-orange text-white">
           <div className="stat-title">
-            <span className="text-muted">Total Replies</span>
-            <span className="stat-icon" style={{ borderColor: "var(--line)", color: "var(--fg)" }}>
+            <span className="text-white/80">Total Replies</span>
+            <span className="stat-icon" style={{ borderColor: "rgba(255,255,255,0.5)" }}>
               ✉
             </span>
           </div>
           <div className="stat-value">{replied}</div>
-          <div className="stat-trend text-muted">
+          <div className="stat-trend text-white/80">
             People who wrote back
           </div>
         </div>
@@ -108,16 +108,16 @@ export default async function DashboardPage() {
             className="donut-container"
             style={{
               borderRadius: "50%",
-              background: `conic-gradient(white ${reachedPercent}%, rgba(255,255,255,0.25) 0)`,
+              background: `conic-gradient(var(--lime) ${reachedPercent}%, rgba(255,255,255,0.15) 0)`,
             }}
           >
-            <div style={{ position: "absolute", inset: "15px", background: "var(--accent)", borderRadius: "50%" }} />
+            <div style={{ position: "absolute", inset: "15px", background: "var(--ink)", borderRadius: "50%" }} />
             <div className="donut-text">
-              <h4 style={{ color: "white" }}>{totalContacts}</h4>
-              <span style={{ color: "rgba(255,255,255,0.85)" }}>Contacts</span>
+              <h4 style={{ color: "var(--lime)" }}>{totalContacts}</h4>
+              <span style={{ color: "rgba(255,255,255,0.75)" }}>Contacts</span>
             </div>
           </div>
-          <p className="mt-3 text-xs" style={{ color: "rgba(255,255,255,0.85)" }}>
+          <p className="mt-3 text-xs" style={{ color: "rgba(255,255,255,0.75)" }}>
             {reachedPercent}% reached at least once
           </p>
         </div>
