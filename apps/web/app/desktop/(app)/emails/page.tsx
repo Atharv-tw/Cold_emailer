@@ -48,7 +48,7 @@ export default async function EmailsPage() {
           <p>Emails you send will show up here.</p>
         </div>
       ) : (
-        <div className="dz-card" style={{ padding: 0 }}>
+        <div className="dz-card">
           <div className="flex flex-col">
             {messages.map((message) => {
               const tone = statusOf(message);
