@@ -15,7 +15,7 @@ describe("TargetFilters", () => {
 
   it("puts a chosen facet into the url", async () => {
     render(<TargetFilters active={{}} />);
-    await userEvent.click(screen.getByRole("button", { name: "Replied" }));
+    await userEvent.selectOptions(screen.getByLabelText("Filter by status"), "replied");
     expect(push).toHaveBeenCalledWith("/targets?status=replied");
   });
 
@@ -28,7 +28,7 @@ describe("TargetFilters", () => {
 
   it("keeps existing facets when a new one is added", async () => {
     render(<TargetFilters active={{ status: "active" }} />);
-    await userEvent.click(screen.getByRole("button", { name: "Internship" }));
+    await userEvent.selectOptions(screen.getByLabelText("Filter by goal"), "internship");
     const url = push.mock.calls.at(-1)?.[0] as string;
     expect(url).toContain("status=active");
     expect(url).toContain("intent=internship");

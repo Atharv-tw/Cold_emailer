@@ -71,6 +71,7 @@ function SelectGroup({
     <div className="flex items-center gap-2">
       <span className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</span>
       <select
+        aria-label={`Filter by ${label.toLowerCase()}`}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="rounded border border-line bg-surface px-2 py-1 text-sm text-fg outline-none focus:border-accent"
