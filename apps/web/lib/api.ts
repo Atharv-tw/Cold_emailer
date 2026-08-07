@@ -22,9 +22,12 @@ export class ApiError extends Error {
 }
 
 async function apiToken(): Promise<string | undefined> {
+  const isProd = process.env.NODE_ENV === "production";
   const token = await getToken({
     req: { headers: await headers(), cookies: await cookies() } as never,
     secret: process.env.AUTH_SECRET!,
+    salt: isProd ? "__Secure-authjs.session-token" : "authjs.session-token",
+    secureCookie: isProd,
   });
   return token?.apiToken as string | undefined;
 }
