@@ -88,6 +88,7 @@ async function exchange(account: {
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     Google({
+      checks: ["pkce"],
       authorization: {
         params: {
           scope: SCOPES,
