@@ -1,15 +1,18 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import {
   deleteMyData,
+  removeAvatar,
   saveExperience,
   saveProfile,
   saveProjects,
+  uploadAvatar,
   uploadResume,
-} from "@/app/desktop/profile/actions";
-import type { Disclosure, Profile, Project, Experience } from "@/lib/types";
+} from "@/app/desktop/(app)/profile/actions";
+import { useGeminiKey } from "@/lib/useGeminiKey";
+import type { Disclosure, Profile, Project, Experience, SessionUser } from "@/lib/types";
 
 /**
  * The profile screen.
@@ -24,6 +27,7 @@ import type { Disclosure, Profile, Project, Experience } from "@/lib/types";
 type Props = {
   profile: Profile;
   disclosure: Disclosure;
+  user: SessionUser;
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -42,13 +46,14 @@ function commaList(value: string): string[] {
     .filter(Boolean);
 }
 
-export default function ProfileForm({ profile, disclosure }: Props) {
+export default function ProfileForm({ profile, disclosure, user }: Props) {
   const [headline, setHeadline] = useState(profile.headline);
   const [bio, setBio] = useState(profile.bio);
   const [education, setEducation] = useState(profile.education);
   const [availability, setAvailability] = useState(profile.availability);
   const [links, setLinks] = useState<Record<string, string>>({
     portfolio: profile.links.portfolio ?? "",
+    resume: profile.links.resume ?? "",
     linkedin: profile.links.linkedin ?? "",
     github: profile.links.github ?? "",
     other: profile.links.other ?? "",
@@ -62,6 +67,12 @@ export default function ProfileForm({ profile, disclosure }: Props) {
   const [status, setStatus] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [pending, startTransition] = useTransition();
+  const { key: geminiKey, setKey: setGeminiKey, hasKey: hasGeminiKey } = useGeminiKey();
+  const [geminiDraft, setGeminiDraft] = useState(geminiKey);
+  const [avatarPreview, setAvatarPreview] = useState(user.avatar);
+  const [avatarPending, startAvatarTransition] = useTransition();
+
+  useEffect(() => setGeminiDraft(geminiKey), [geminiKey]);
 
   function claim(field: string) {
     setExtracted((current) => {
@@ -79,9 +90,13 @@ export default function ProfileForm({ profile, disclosure }: Props) {
 
   async function onUpload(form: FormData) {
     setError("");
+    if (!hasGeminiKey) {
+      setError("Add your Gemini API key above before uploading a resume.");
+      return;
+    }
     setStatus("Reading your resume…");
     try {
-      const parsed = await uploadResume(form);
+      const parsed = await uploadResume(form, geminiKey);
       const touched = new Set<string>();
 
       if (parsed.headline) {
@@ -121,6 +136,37 @@ export default function ProfileForm({ profile, disclosure }: Props) {
     }
   }
 
+  function onAvatarChosen(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setError("");
+    setAvatarPreview(URL.createObjectURL(file));
+    startAvatarTransition(async () => {
+      try {
+        const form = new FormData();
+        form.append("file", file);
+        await uploadAvatar(form);
+        setStatus("Photo updated.");
+      } catch (exception) {
+        setAvatarPreview(user.avatar);
+        setError(exception instanceof Error ? exception.message : "Could not upload that image.");
+      }
+    });
+  }
+
+  function onAvatarRemove() {
+    setError("");
+    startAvatarTransition(async () => {
+      try {
+        await removeAvatar();
+        setAvatarPreview("");
+        setStatus("Photo removed.");
+      } catch (exception) {
+        setError(exception instanceof Error ? exception.message : "Could not remove that image.");
+      }
+    });
+  }
+
   function onSave() {
     setError("");
     startTransition(async () => {
@@ -147,6 +193,78 @@ export default function ProfileForm({ profile, disclosure }: Props) {
 
   return (
     <div className="stack">
+      <section className="flex items-center gap-4">
+        {avatarPreview ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={avatarPreview} alt="" className="h-16 w-16 rounded-full object-cover" />
+        ) : (
+          <div className="avatar" style={{ width: "64px", height: "64px", fontSize: "24px" }}>
+            {(user.name || user.email || "?").charAt(0).toUpperCase()}
+          </div>
+        )}
+        <div>
+          <h2 style={{ marginBottom: "0.25rem" }}>Profile picture</h2>
+          <div className="flex gap-2">
+            <label className="secondary" style={{ display: "inline-flex", cursor: "pointer" }}>
+              {avatarPending ? "Uploading…" : "Upload photo"}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={onAvatarChosen}
+                disabled={avatarPending}
+                style={{ display: "none" }}
+              />
+            </label>
+            {avatarPreview && (
+              <button type="button" className="quiet" onClick={onAvatarRemove} disabled={avatarPending}>
+                Remove
+              </button>
+            )}
+          </div>
+          <p className="muted" style={{ fontSize: "12px", marginTop: "0.25rem" }}>
+            Falls back to your Google account picture if you don&rsquo;t upload one.
+          </p>
+        </div>
+      </section>
+
+      <section>
+        <h2>AI</h2>
+        <label>
+          Gemini API key
+          <input
+            type="password"
+            value={geminiDraft}
+            onChange={(event) => setGeminiDraft(event.target.value)}
+            placeholder="AIza…"
+          />
+        </label>
+        <div className="flex gap-2">
+          <button type="button" className="secondary" onClick={() => setGeminiKey(geminiDraft)}>
+            Save key
+          </button>
+          {hasGeminiKey && (
+            <button
+              type="button"
+              className="quiet"
+              onClick={() => {
+                setGeminiKey("");
+                setGeminiDraft("");
+              }}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+        <p className="muted" style={{ fontSize: "12px" }}>
+          Powers drafting and resume reading. Kept only in this browser tab — never sent anywhere
+          but the API, and gone the moment you close the tab. Get a free key at{" "}
+          <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">
+            aistudio.google.com/apikey
+          </a>
+          .
+        </p>
+      </section>
+
       <section>
         <h2>Upload a resume</h2>
         <div className="note">
@@ -237,9 +355,17 @@ export default function ProfileForm({ profile, disclosure }: Props) {
 
         <fieldset>
           <legend>Links {badge("links")}</legend>
-          {(["portfolio", "github", "linkedin", "other"] as const).map((key) => (
+          {(
+            [
+              ["portfolio", "Portfolio"],
+              ["resume", "Resume link"],
+              ["github", "GitHub"],
+              ["linkedin", "LinkedIn"],
+              ["other", "Other"],
+            ] as const
+          ).map(([key, label]) => (
             <label key={key}>
-              {key}
+              {label}
               <input
                 value={links[key] ?? ""}
                 onChange={(event) => {
@@ -430,7 +556,7 @@ export default function ProfileForm({ profile, disclosure }: Props) {
               setHeadline("");
               setBio("");
               setEducation("");
-              setLinks({ portfolio: "", linkedin: "", github: "", other: "" });
+              setLinks({ portfolio: "", resume: "", linkedin: "", github: "", other: "" });
               setProjects([]);
               setExperience([]);
               setExtracted(new Set());

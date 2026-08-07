@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { generateDraft, saveDraft, scheduleSend, sendNow } from "@/app/desktop/dashboard/actions";
+import { generateDraft, saveDraft, scheduleSend, sendNow } from "@/app/desktop/(app)/dashboard/actions";
+import { useGeminiKey } from "@/lib/useGeminiKey";
 import type { Draft, EmailTemplate, Target } from "@/lib/types";
 
 /**
@@ -32,6 +33,7 @@ export default function DraftEditor({
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
+  const { key: geminiKey, hasKey: hasGeminiKey } = useGeminiKey();
 
   const step = (initial?.step ?? target.touches_sent + 1) || 1;
   const isFollowUp = step > 1;
@@ -99,11 +101,12 @@ export default function DraftEditor({
         <button
           type="button"
           className="quiet"
-          disabled={pending}
+          disabled={pending || !hasGeminiKey}
+          title={hasGeminiKey ? undefined : "Add your Gemini API key in Settings first"}
           onClick={() =>
             run(async () => {
               setStatus("Writing…");
-              const draft = await generateDraft(target.id, instruction, templateKey);
+              const draft = await generateDraft(target.id, instruction, templateKey, geminiKey);
               setSubject(draft.subject);
               setBody(draft.body);
               setWarnings(draft.warnings);
@@ -113,6 +116,11 @@ export default function DraftEditor({
         >
           {initial ? "Write it again" : "Write it for me"}
         </button>
+        {!hasGeminiKey && (
+          <p className="muted" style={{ fontSize: "12px", marginTop: "0.25rem" }}>
+            Add your Gemini API key in Settings to write drafts automatically.
+          </p>
+        )}
       </section>
 
       <section>

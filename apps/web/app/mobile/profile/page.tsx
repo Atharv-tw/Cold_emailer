@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import ProfileForm from "@/components/ProfileForm";
 import { api } from "@/lib/api";
-import type { Disclosure, Profile } from "@/lib/types";
+import type { Disclosure, Profile, SessionUser } from "@/lib/types";
 
 export default async function ProfilePage() {
   const session = await auth();
@@ -11,9 +11,10 @@ export default async function ProfilePage() {
 
   // The disclosure is served by the API rather than written here, so the
   // wording cannot drift from what the upload endpoint actually does.
-  const [profile, disclosure] = await Promise.all([
+  const [profile, disclosure, user] = await Promise.all([
     api<Profile>("/v1/profile"),
     api<Disclosure>("/v1/resumes/disclosure"),
+    api<SessionUser>("/v1/auth/me").catch(() => session.apiUser!),
   ]);
 
   return (
@@ -23,7 +24,7 @@ export default async function ProfilePage() {
         This is what your emails get written from. The more specific it is, the
         less the mail reads like a template.
       </p>
-      <ProfileForm profile={profile} disclosure={disclosure} />
+      <ProfileForm profile={profile} disclosure={disclosure} user={user} />
     </main>
   );
 }

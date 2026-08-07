@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { api } from "@/lib/api";
-import type { ParsedResume, Profile } from "@/lib/types";
+import type { AvatarOut, ParsedResume, Profile } from "@/lib/types";
 
 /**
  * Server actions for the profile screen.
@@ -13,10 +13,13 @@ import type { ParsedResume, Profile } from "@/lib/types";
  * there is no credential in the browser to authenticate it with.
  */
 
-export async function uploadResume(form: FormData): Promise<ParsedResume> {
+export async function uploadResume(form: FormData, geminiKey: string): Promise<ParsedResume> {
   const file = form.get("file");
   if (!(file instanceof File) || file.size === 0) {
     throw new Error("Choose a PDF or .docx first.");
+  }
+  if (!geminiKey.trim()) {
+    throw new Error("Add your Gemini API key in Settings to use AI features.");
   }
 
   const forwarded = new FormData();
@@ -26,7 +29,11 @@ export async function uploadResume(form: FormData): Promise<ParsedResume> {
   // `api` leaves Content-Type off a FormData body so fetch can write the
   // multipart boundary itself. Passing `headers: {}` here does not achieve
   // that - spreading an empty object removes nothing.
-  return api<ParsedResume>("/v1/resumes", { method: "POST", body: forwarded });
+  return api<ParsedResume>("/v1/resumes", {
+    method: "POST",
+    body: forwarded,
+    headers: { "X-Gemini-Api-Key": geminiKey.trim() },
+  });
 }
 
 export async function saveProfile(payload: unknown): Promise<Profile> {
@@ -59,4 +66,24 @@ export async function saveExperience(payload: unknown): Promise<Profile> {
 export async function deleteMyData(): Promise<void> {
   await api<void>("/v1/profile/data", { method: "DELETE" });
   revalidatePath("/profile");
+}
+
+export async function uploadAvatar(form: FormData): Promise<AvatarOut> {
+  const file = form.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    throw new Error("Choose an image first.");
+  }
+  const forwarded = new FormData();
+  forwarded.append("file", file);
+  const result = await api<AvatarOut>("/v1/profile/avatar", { method: "POST", body: forwarded });
+  // "layout" (not the default "page") also revalidates (app)/layout.tsx,
+  // which is where the topbar reads the avatar from - otherwise only the
+  // profile page itself would pick up the change.
+  revalidatePath("/profile", "layout");
+  return result;
+}
+
+export async function removeAvatar(): Promise<void> {
+  await api<void>("/v1/profile/avatar", { method: "DELETE" });
+  revalidatePath("/profile", "layout");
 }
