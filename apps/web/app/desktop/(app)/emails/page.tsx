@@ -15,12 +15,26 @@ function when(iso: string | null): string {
   });
 }
 
-function statusOf(message: MessageOut): { label: string; tone: string } {
-  if (message.is_undeliverable) return { label: "Undeliverable", tone: "badge-danger" };
-  if (message.status === "failed") return { label: "Failed", tone: "badge-danger" };
-  if (message.is_reply) return { label: "Replied", tone: "badge-completed" };
-  if (message.status === "sent") return { label: "Sent", tone: "badge-pending" };
-  return { label: message.status, tone: "badge-pending" };
+function statusOf(message: MessageOut): {
+  label: string;
+  tone: string;
+  accent: string;
+  iconBg: string;
+  iconColor: string;
+} {
+  if (message.is_undeliverable) {
+    return { label: "Undeliverable", tone: "badge-danger", accent: "var(--danger)", iconBg: "var(--danger-light)", iconColor: "var(--danger)" };
+  }
+  if (message.status === "failed") {
+    return { label: "Failed", tone: "badge-danger", accent: "var(--danger)", iconBg: "var(--danger-light)", iconColor: "var(--danger)" };
+  }
+  if (message.is_reply) {
+    return { label: "Replied", tone: "badge-completed", accent: "var(--accent)", iconBg: "var(--accent-light)", iconColor: "var(--accent)" };
+  }
+  if (message.status === "sent") {
+    return { label: "Sent", tone: "badge-pending", accent: "var(--orange)", iconBg: "var(--orange-light)", iconColor: "var(--orange)" };
+  }
+  return { label: message.status, tone: "badge-pending", accent: "var(--line)", iconBg: "var(--cream)", iconColor: "var(--muted)" };
 }
 
 export default async function EmailsPage() {
@@ -48,37 +62,35 @@ export default async function EmailsPage() {
           <p>Emails you send will show up here.</p>
         </div>
       ) : (
-        <div className="dz-card">
-          <div className="flex flex-col">
-            {messages.map((message) => {
-              const tone = statusOf(message);
-              return (
-                <Link
-                  key={message.id}
-                  href={`/targets/${message.target_id}`}
-                  className={`list-item ${message.is_undeliverable ? "opacity-60" : ""}`}
-                >
-                  <div
-                    className="list-icon"
-                    style={{ background: "var(--accent-light)", color: "var(--accent)" }}
-                  >
-                    {(message.target_name || message.target_email).charAt(0).toUpperCase()}
+        <div className="dz-card mx-auto w-full max-w-4xl gap-2">
+          {messages.map((message) => {
+            const tone = statusOf(message);
+            return (
+              <Link
+                key={message.id}
+                href={`/targets/${message.target_id}`}
+                className={`grid grid-cols-[auto_minmax(0,1fr)_auto_96px] items-center gap-4 rounded-xl border-l-4 px-3 py-3 transition-colors hover:bg-bg ${
+                  message.is_undeliverable ? "opacity-60" : ""
+                }`}
+                style={{ borderColor: tone.accent }}
+              >
+                <div className="list-icon" style={{ background: tone.iconBg, color: tone.iconColor }}>
+                  {(message.target_name || message.target_email).charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold text-fg">
+                    {message.subject || "(no subject)"}
                   </div>
-                  <div className="list-content">
-                    <div className="list-title">{message.subject || "(no subject)"}</div>
-                    <div className="list-desc">
-                      {message.target_name || message.target_email} · {message.target_company || "—"}
-                      {message.error && ` · ${message.error}`}
-                    </div>
+                  <div className="truncate text-xs text-muted">
+                    {message.target_name || message.target_email} · {message.target_company || "—"}
+                    {message.error && ` · ${message.error}`}
                   </div>
-                  <span className={`badge ${tone.tone}`}>{tone.label}</span>
-                  <div style={{ fontSize: "11px", color: "var(--muted)", minWidth: "110px", textAlign: "right" }}>
-                    {when(message.sent_at)}
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
+                </div>
+                <span className={`badge ${tone.tone}`}>{tone.label}</span>
+                <div className="text-right text-xs text-muted">{when(message.sent_at)}</div>
+              </Link>
+            );
+          })}
         </div>
       )}
     </>
