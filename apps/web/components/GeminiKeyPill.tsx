@@ -18,11 +18,16 @@ export default function GeminiKeyPill() {
           setDraft(key);
           setOpen(true);
         }}
-        className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-          hasKey ? "border-accent bg-accent-light text-accent" : "border-line bg-surface text-muted"
+        className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5 ${
+          hasKey ? "border-accent bg-accent-light text-accent" : "border-warning bg-warning-light text-warning"
         }`}
       >
-        {hasKey ? "Gemini key set" : "Gemini key: not set"}
+        {hasKey ? "Gemini key set" : (
+          <>
+            <span style={{ fontSize: "14px", lineHeight: 1 }}>⚠️</span>
+            Gemini key: not set
+          </>
+        )}
       </button>
 
       <Modal open={open} onClose={() => setOpen(false)} title="Your Gemini API key" widthClassName="max-w-sm">

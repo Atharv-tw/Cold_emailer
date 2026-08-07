@@ -79,15 +79,15 @@ export default async function DashboardPage() {
 
       {/* Row 1: replies / sent trend / total contacts */}
       <div className="grid grid-cols-4 gap-5">
-        <div className="dz-card bg-[#f97316] text-white">
+        <div className="dz-card">
           <div className="stat-title">
-            <span>Total Replies</span>
-            <span className="stat-icon" style={{ borderColor: "rgba(255,255,255,0.5)" }}>
+            <span className="text-muted">Total Replies</span>
+            <span className="stat-icon" style={{ borderColor: "var(--line)", color: "var(--fg)" }}>
               ✉
             </span>
           </div>
           <div className="stat-value">{replied}</div>
-          <div className="stat-trend" style={{ color: "rgba(255,255,255,0.85)" }}>
+          <div className="stat-trend text-muted">
             People who wrote back
           </div>
         </div>

@@ -171,7 +171,7 @@ button.danger:hover {
 
 /* Cards */
 .dz-card {
-  background: var(--surface);
+  background-color: var(--surface);
   border-radius: var(--radius-lg);
   padding: 1.5rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
