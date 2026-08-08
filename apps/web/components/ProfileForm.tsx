@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import {
   removeAvatar,
@@ -156,6 +156,54 @@ function EntryCard({
       </div>
       <div className="flex flex-col gap-3">{children}</div>
     </div>
+  );
+}
+
+/**
+ * A comma-separated list field.
+ *
+ * This has to hold its own draft text. The obvious version - value is
+ * `list.join(", ")`, onChange is `commaList(text)` - cannot be typed into at
+ * all: `commaList` drops empty segments, so the moment you press comma the
+ * parse returns the same list, the value re-renders as the old string, and
+ * the comma is gone before the next keystroke. Same for a space, which gets
+ * trimmed. The field looks like the keyboard is dead.
+ *
+ * So the draft is what you typed and the parsed list is what leaves. The
+ * draft is only re-seeded when the list changes from somewhere else - a
+ * resume fill - which is what the comparison against our own parse detects.
+ * On blur it re-seeds unconditionally, so what you see settles into the
+ * canonical lowercase form that was actually stored.
+ */
+function ListInput({
+  value,
+  placeholder,
+  onChange,
+}: {
+  value: string[];
+  placeholder?: string;
+  onChange: (next: string[]) => void;
+}) {
+  const [draft, setDraft] = useState(value.join(", "));
+
+  useEffect(() => {
+    const incoming = value.join(", ");
+    if (incoming !== commaList(draft).join(", ")) setDraft(incoming);
+    // Re-seeding on our own round-trip is the bug this component exists to
+    // avoid, so `draft` deliberately stays out of the dependency list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  return (
+    <input
+      value={draft}
+      placeholder={placeholder}
+      onChange={(event) => {
+        setDraft(event.target.value);
+        onChange(commaList(event.target.value));
+      }}
+      onBlur={() => setDraft(value.join(", "))}
+    />
   );
 }
 
@@ -712,17 +760,17 @@ export default function ProfileForm({ profile, disclosure, user }: Props) {
 
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Field label="Categories" hint="Comma separated">
-                      <input
-                        value={(project.categories ?? []).join(", ")}
+                      <ListInput
+                        value={project.categories ?? []}
                         placeholder="ai, fintech, infra"
-                        onChange={(event) => update({ categories: commaList(event.target.value) })}
+                        onChange={(categories) => update({ categories })}
                       />
                     </Field>
                     <Field label="Best for" hint="Who it impresses">
-                      <input
-                        value={(project.best_for ?? []).join(", ")}
+                      <ListInput
+                        value={project.best_for ?? []}
                         placeholder="founder, recruiter, internship"
-                        onChange={(event) => update({ best_for: commaList(event.target.value) })}
+                        onChange={(best_for) => update({ best_for })}
                       />
                     </Field>
                   </div>

@@ -64,10 +64,10 @@ export default function DesktopChrome({
   return (
     <div className="min-h-screen">
       <aside className="rail group">
-        <Link href="/dashboard" className="flex items-center gap-3 px-2 py-1">
+        <Link href="/dashboard" className="flex items-center gap-[0.85rem] p-[0.65rem]">
           <span className="rail-icon">
             <span
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-bold"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[14px] font-bold pt-[1px]"
               style={{ background: "var(--lime)", color: "var(--ink)", fontFamily: "var(--font-display)" }}
             >
               O
