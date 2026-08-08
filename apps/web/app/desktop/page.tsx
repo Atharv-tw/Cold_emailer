@@ -2,31 +2,84 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+import Icon from "@/components/Icon";
+import LandingAccordion from "@/components/LandingAccordion";
 
-function Feature({
+/* ---------- sub-components (server, no state) ---------- */
+
+function Logo() {
+  return (
+    <div className="flex items-center gap-2.5">
+      <span
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[14px] font-bold"
+        style={{
+          background: "var(--lime)",
+          color: "var(--ink)",
+          fontFamily: "var(--font-display)",
+        }}
+      >
+        O
+      </span>
+      <span
+        className="text-[17px] font-bold text-fg"
+        style={{ fontFamily: "var(--font-display)", letterSpacing: "-0.02em" }}
+      >
+        Outreach
+      </span>
+    </div>
+  );
+}
+
+function StepCard({
+  number,
+  title,
+  body,
+  tone,
+}: {
+  number: string;
+  title: string;
+  body: string;
+  tone: string;
+}) {
+  return (
+    <div className="landing-step">
+      <div className="landing-step-num" style={{ background: tone }}>
+        {number}
+      </div>
+      <h3 className="text-fg">{title}</h3>
+      <p className="text-sm text-muted">{body}</p>
+    </div>
+  );
+}
+
+function FeatureCard({
   icon,
   title,
   body,
-  tint,
+  iconBg,
+  iconFg,
+  variant,
 }: {
-  icon: string;
+  icon: React.ReactNode;
   title: string;
   body: string;
-  tint: "accent" | "lime" | "orange" | "purple";
+  iconBg: string;
+  iconFg: string;
+  variant?: "hero" | "lime" | "default";
 }) {
-  const tones: Record<typeof tint, { bg: string; fg: string }> = {
-    accent: { bg: "var(--accent-light)", fg: "var(--accent)" },
-    lime: { bg: "#f2fbd9", fg: "var(--lime-dark)" },
-    orange: { bg: "var(--orange-light)", fg: "var(--orange)" },
-    purple: { bg: "var(--purple-light)", fg: "var(--purple)" },
-  };
-  const tone = tones[tint];
+  const cls = [
+    "landing-feature",
+    variant === "hero" ? "landing-feature-hero" : "",
+    variant === "lime" ? "landing-feature-lime" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-5 text-left">
+    <div className={cls}>
       <div
-        className="flex h-10 w-10 items-center justify-center rounded-full text-lg"
-        style={{ background: tone.bg, color: tone.fg }}
+        className="landing-feature-icon"
+        style={{ background: iconBg, color: iconFg }}
       >
         {icon}
       </div>
@@ -36,29 +89,28 @@ function Feature({
   );
 }
 
-function Step({ number, title, body, tone }: { number: string; title: string; body: string; tone: string }) {
-  return (
-    <div className="flex flex-1 flex-col gap-3 text-left">
-      <div
-        className="flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-white"
-        style={{ background: tone }}
-      >
-        {number}
-      </div>
-      <h3 className="text-fg">{title}</h3>
-      <p className="text-sm text-muted">{body}</p>
-    </div>
-  );
-}
+/* ---------- data ---------- */
 
-function Faq({ q, a }: { q: string; a: string }) {
-  return (
-    <div className="border-b border-line py-5 last:border-none">
-      <h3 className="mb-1.5 text-fg">{q}</h3>
-      <p className="text-sm text-muted">{a}</p>
-    </div>
-  );
-}
+const FAQ_ITEMS = [
+  {
+    q: "Will it send emails without me?",
+    a: "No. Generating a draft never sends anything — you always review and press send yourself, one email at a time.",
+  },
+  {
+    q: 'I saw an "unverified app" warning from Google — is that normal?',
+    a: "Yes. The Google consent screen is still in testing mode, so you'll see that warning. It's expected, and access is capped at 100 accounts for now.",
+  },
+  {
+    q: "Do I need to pay for an AI key?",
+    a: "No — Google's Gemini API has a free tier that's enough for regular use. You paste your own key into Settings; it's never stored on the server.",
+  },
+  {
+    q: "Why does it need to read my inbox?",
+    a: "Purely to notice replies, so the tool never emails someone who already wrote back. It only ever looks at threads it started.",
+  },
+];
+
+/* ---------- page ---------- */
 
 export default async function Home() {
   const session = await auth();
@@ -66,11 +118,341 @@ export default async function Home() {
 
   return (
     <main className="flex min-h-screen flex-col bg-bg">
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-bg/90 px-8 py-5 backdrop-blur sm:px-16">
-        <div className="flex items-center gap-2 text-xl font-bold text-accent">
-          <span className="text-2xl">◎</span> Outreach
-        </div>
+      {/* ─── Header ─── */}
+      <header
+        className="sticky top-0 z-10 flex items-center justify-between px-8 py-4 backdrop-blur sm:px-16"
+        style={{
+          background: "rgba(234, 236, 223, 0.85)",
+          borderBottom: "1px solid var(--line)",
+        }}
+      >
+        <Logo />
         <nav className="hidden items-center gap-8 text-sm font-medium text-muted sm:flex">
+          <a href="#how-it-works" className="transition-colors hover:text-fg">
+            How it works
+          </a>
+          <a href="#features" className="transition-colors hover:text-fg">
+            Features
+          </a>
+          <a href="#faq" className="transition-colors hover:text-fg">
+            FAQ
+          </a>
+        </nav>
+        <Link href="/login">
+          <button className="primary" style={{ borderRadius: "999px" }}>
+            Sign in
+          </button>
+        </Link>
+      </header>
+
+      {/* ─── Hero ─── */}
+      <section
+        className="relative mx-auto flex w-full max-w-5xl flex-col items-center gap-8 overflow-hidden px-6 py-16 text-center sm:py-20"
+      >
+        {/* Subtle gradient glow — centred behind headline */}
+        <div
+          className="pointer-events-none absolute left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2"
+          style={{
+            width: "700px",
+            height: "500px",
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(198, 239, 78, 0.18) 0%, transparent 70%)",
+            filter: "blur(60px)",
+          }}
+        />
+
+        {/* Badge */}
+        <span
+          className="relative z-[1] rounded-full px-4 py-1.5 text-xs font-semibold"
+          style={{ background: "var(--lime)", color: "var(--accent)" }}
+        >
+          Built for students &amp; early-career job hunters
+        </span>
+
+        {/* Headline */}
+        <h1
+          className="relative z-[1] max-w-3xl text-5xl font-bold text-fg sm:text-6xl"
+          style={{
+            fontFamily: "var(--font-display)",
+            letterSpacing: "-0.04em",
+            lineHeight: 1.08,
+          }}
+        >
+          Cold outreach that
+          <br />
+          sounds like{" "}
+          <span
+            style={{
+              background: "linear-gradient(135deg, var(--accent), var(--lime-dark))",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+            }}
+          >
+            you
+          </span>
+          .
+        </h1>
+
+        {/* Sub copy */}
+        <p className="relative z-[1] max-w-xl text-lg text-muted" style={{ lineHeight: 1.7 }}>
+          Sign in with Google, add your resume, and add the people you want to
+          reach. Every email is drafted from what you actually built — nothing
+          sends until you press send.
+        </p>
+
+        {/* CTAs */}
+        <div className="relative z-[1] flex flex-wrap items-center justify-center gap-4">
+          <Link href="/login">
+            <button
+              className="accent"
+              style={{
+                borderRadius: "2rem",
+                padding: "0.85rem 2.25rem",
+                fontSize: "16px",
+                fontWeight: 700,
+              }}
+            >
+              Get started with Google
+            </button>
+          </Link>
+          <a href="#how-it-works">
+            <button
+              className="secondary"
+              style={{
+                borderRadius: "2rem",
+                padding: "0.85rem 2.25rem",
+                fontSize: "16px",
+              }}
+            >
+              See how it works ↓
+            </button>
+          </a>
+        </div>
+
+        {/* Trust badges */}
+        <div className="relative z-[1] mt-2 flex flex-wrap items-center justify-center gap-3">
+          <span className="landing-trust">
+            <Icon name="check" size={14} strokeWidth={2.5} /> Free — bring your
+            own Gemini key
+          </span>
+          <span className="landing-trust">
+            <Icon name="check" size={14} strokeWidth={2.5} /> Nothing sends
+            automatically
+          </span>
+          <span className="landing-trust">
+            <Icon name="check" size={14} strokeWidth={2.5} /> Verifies addresses
+            first
+          </span>
+        </div>
+      </section>
+
+      {/* ─── How it works ─── */}
+      <section
+        id="how-it-works"
+        className="border-t border-line bg-surface px-6 py-24 sm:px-16"
+      >
+        <div className="mx-auto max-w-5xl">
+          <div className="mb-12 text-center">
+            <span
+              className="mb-3 inline-block rounded-full px-3 py-1 text-xs font-semibold"
+              style={{ background: "var(--lime-tint)", color: "var(--accent)" }}
+            >
+              Simple setup
+            </span>
+            <h2
+              className="text-3xl font-bold text-fg"
+              style={{
+                fontFamily: "var(--font-display)",
+                letterSpacing: "-0.03em",
+              }}
+            >
+              Four steps. You always press send.
+            </h2>
+            <p className="mx-auto mt-3 max-w-lg text-muted">
+              No sequences to configure, no drip campaigns. Just a straight line from your
+              resume to a real, personal email.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <StepCard
+              number="1"
+              title="Add your resume"
+              body="Upload it once. It's read into a headline, bio, projects and experience you can edit."
+              tone="var(--ink)"
+            />
+            <StepCard
+              number="2"
+              title="Add people to reach"
+              body="One at a time, or import a whole list — a founder, a hiring manager, a professor."
+              tone="var(--orange)"
+            />
+            <StepCard
+              number="3"
+              title="Get a real draft"
+              body="Not a template — a real email naming a specific project and why it's relevant to them."
+              tone="var(--purple)"
+            />
+            <StepCard
+              number="4"
+              title="Review and send"
+              body="Nothing goes out until you say so. Replies and bounces are tracked automatically."
+              tone="var(--lime-dark)"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* ─── Features ─── */}
+      <section id="features" className="px-6 py-24 sm:px-16">
+        <div className="mx-auto max-w-5xl">
+          <div className="mb-12 text-center">
+            <span
+              className="mb-3 inline-block rounded-full px-3 py-1 text-xs font-semibold"
+              style={{ background: "var(--lime-tint)", color: "var(--accent)" }}
+            >
+              Features
+            </span>
+            <h2
+              className="text-3xl font-bold text-fg"
+              style={{
+                fontFamily: "var(--font-display)",
+                letterSpacing: "-0.03em",
+              }}
+            >
+              Everything cold outreach actually needs
+            </h2>
+            <p className="mx-auto mt-3 max-w-lg text-muted">
+              No CRM to configure, no sequences to design. Just the parts that
+              matter.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {/* Hero card — spans 2 cols */}
+            <FeatureCard
+              variant="hero"
+              icon={<Icon name="sparkle" size={22} />}
+              title="Drafted from your work"
+              body="Emails are written from your resume and projects, not a generic template — every draft names something real you built."
+              iconBg="rgba(198, 239, 78, 0.2)"
+              iconFg="var(--lime)"
+            />
+
+            <FeatureCard
+              icon={<Icon name="user" size={20} />}
+              title="You stay in control"
+              body="Generating a draft never sends it. Review, edit, then press send yourself, every time."
+              iconBg="var(--lime-tint)"
+              iconFg="var(--accent)"
+            />
+
+            <FeatureCard
+              icon={<Icon name="mail" size={20} />}
+              title="Tracks what happens"
+              body="Replies, bounces and follow-ups are tracked automatically, so nobody slips through."
+              iconBg="var(--orange-light)"
+              iconFg="var(--orange)"
+            />
+
+            {/* Lime card */}
+            <FeatureCard
+              variant="lime"
+              icon={<Icon name="check" size={20} />}
+              title="Checks addresses first"
+              body="Every address is verified before you send — no guessing whether a made-up address will bounce."
+              iconBg="rgba(10, 10, 10, 0.1)"
+              iconFg="var(--ink)"
+            />
+
+            <FeatureCard
+              icon={<Icon name="users" size={20} />}
+              title="One list, filtered your way"
+              body="Filter contacts by company type, role, or what you're asking for, so you always know who's next."
+              iconBg="var(--purple-light)"
+              iconFg="var(--purple)"
+            />
+
+
+          </div>
+        </div>
+      </section>
+
+      {/* ─── FAQ ─── */}
+      <section
+        id="faq"
+        className="border-t border-line bg-surface px-6 py-24 sm:px-16"
+      >
+        <div className="mx-auto max-w-2xl">
+          <div className="mb-10 text-center">
+            <span
+              className="mb-3 inline-block rounded-full px-3 py-1 text-xs font-semibold"
+              style={{ background: "var(--lime-tint)", color: "var(--accent)" }}
+            >
+              FAQ
+            </span>
+            <h2
+              className="text-3xl font-bold text-fg"
+              style={{
+                fontFamily: "var(--font-display)",
+                letterSpacing: "-0.03em",
+              }}
+            >
+              Questions people actually ask
+            </h2>
+          </div>
+          <LandingAccordion items={FAQ_ITEMS} />
+        </div>
+      </section>
+
+      {/* ─── CTA ─── */}
+      <section className="landing-cta px-6 py-28 sm:px-16">
+        {/* Decorative dots */}
+        <div className="landing-dots">
+          <div className="landing-dot" style={{ top: "15%", left: "10%" }} />
+          <div className="landing-dot" style={{ top: "70%", left: "20%" }} />
+          <div className="landing-dot" style={{ top: "25%", right: "15%" }} />
+          <div className="landing-dot" style={{ bottom: "20%", right: "10%" }} />
+          <div className="landing-dot" style={{ top: "50%", left: "50%" }} />
+        </div>
+
+        <div className="relative z-[1] mx-auto flex max-w-2xl flex-col items-center gap-6 text-center">
+          <h2
+            className="text-4xl font-bold text-white"
+            style={{
+              fontFamily: "var(--font-display)",
+              letterSpacing: "-0.035em",
+              lineHeight: 1.15,
+            }}
+          >
+            Stop sending the same
+            <br />
+            email to everyone.
+          </h2>
+          <p className="max-w-md text-white/65">
+            Sign in with Google and have your first real draft ready in a couple
+            of minutes.
+          </p>
+          <Link href="/login">
+            <button
+              className="accent"
+              style={{
+                borderRadius: "2rem",
+                padding: "0.85rem 2.5rem",
+                fontSize: "16px",
+                fontWeight: 700,
+              }}
+            >
+              Get started with Google
+            </button>
+          </Link>
+        </div>
+      </section>
+
+      {/* ─── Footer ─── */}
+      <footer className="flex flex-col items-center gap-6 px-8 py-10 text-center sm:flex-row sm:justify-between sm:px-16">
+        <Logo />
+        <nav className="flex items-center gap-6 text-xs text-muted">
           <a href="#how-it-works" className="hover:text-fg">
             How it works
           </a>
@@ -81,187 +463,12 @@ export default async function Home() {
             FAQ
           </a>
         </nav>
-        <Link href="/login">
-          <button className="secondary">Sign in</button>
-        </Link>
-      </header>
-
-      {/* Hero */}
-      <section className="mx-auto flex max-w-3xl flex-col items-center gap-6 px-6 py-20 text-center">
-        <span
-          className="rounded-full px-3 py-1 text-xs font-semibold"
-          style={{ background: "#f2fbd9", color: "var(--lime-dark)" }}
-        >
-          Built for students and early-career job hunters
-        </span>
-        <h1 className="text-4xl font-bold tracking-tight text-fg sm:text-5xl">
-          Cold outreach that sounds like <span className="text-accent">you</span>, not a template.
-        </h1>
-        <p className="max-w-xl text-lg text-muted">
-          Sign in with Google, add your resume, and add the people you want to reach. Every email is
-          drafted from what you actually built — nothing sends until you press send.
-        </p>
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          <Link href="/login">
-            <button
-              className="primary"
-              style={{ borderRadius: "2rem", padding: "0.75rem 2rem", fontSize: "16px" }}
-            >
-              Get started with Google
-            </button>
-          </Link>
-          <a href="#how-it-works">
-            <button
-              className="secondary"
-              style={{ borderRadius: "2rem", padding: "0.75rem 2rem", fontSize: "16px" }}
-            >
-              See how it works
-            </button>
-          </a>
-        </div>
-
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm text-muted">
-          <span>✓ Free to use, bring your own Gemini key</span>
-          <span>✓ Nothing sends automatically</span>
-          <span>✓ Verifies addresses before you send</span>
-        </div>
-      </section>
-
-      {/* How it works */}
-      <section id="how-it-works" className="border-t border-line bg-surface px-6 py-20 sm:px-16">
-        <div className="mx-auto max-w-4xl">
-          <h2 className="mb-2 text-2xl font-bold text-fg">How it works</h2>
-          <p className="mb-10 text-muted">Four steps, and you're always the one who presses send.</p>
-          <div className="grid grid-cols-1 gap-8 sm:grid-cols-4">
-            <Step
-              number="1"
-              title="Add your resume"
-              body="Upload it once. It's read into a headline, bio, projects and experience you can edit."
-              tone="var(--accent)"
-            />
-            <Step
-              number="2"
-              title="Add the people you want to reach"
-              body="One at a time, or import a whole list — a founder, a hiring manager, a professor."
-              tone="var(--orange)"
-            />
-            <Step
-              number="3"
-              title="Get a draft, written from your work"
-              body="Not a template — a real email naming a specific project and why it's relevant to them."
-              tone="var(--purple)"
-            />
-            <Step
-              number="4"
-              title="Review, edit, and press send"
-              body="Nothing goes out until you say so. Replies and bounces are tracked automatically."
-              tone="var(--lime-dark)"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* Features */}
-      <section id="features" className="px-6 py-20 sm:px-16">
-        <div className="mx-auto max-w-5xl">
-          <h2 className="mb-2 text-2xl font-bold text-fg">Everything cold outreach actually needs</h2>
-          <p className="mb-10 text-muted">No CRM to configure, no sequences to design. Just the parts that matter.</p>
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            <Feature
-              icon="✍️"
-              tint="accent"
-              title="Drafted for you"
-              body="Emails are written from your resume and projects, not a generic template — every draft names something real."
-            />
-            <Feature
-              icon="🖐️"
-              tint="lime"
-              title="You stay in control"
-              body="Generating a draft never sends it. Review, edit, then press send yourself, every time."
-            />
-            <Feature
-              icon="📬"
-              tint="orange"
-              title="Tracks what happens"
-              body="Replies, bounces and follow-ups are tracked automatically, so nobody you've reached out to slips through."
-            />
-            <Feature
-              icon="✅"
-              tint="purple"
-              title="Checks addresses first"
-              body="Every address is verified before you send — no guessing whether a made-up address will bounce."
-            />
-            <Feature
-              icon="🗂️"
-              tint="accent"
-              title="One list, filtered your way"
-              body="Filter contacts by company type, role, or what you're asking for, so you always know who's next."
-            />
-            <Feature
-              icon="🔑"
-              tint="lime"
-              title="Your own AI key"
-              body="Bring your own free Gemini key. It's never stored on our servers — just kept in your browser tab."
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* FAQ */}
-      <section id="faq" className="border-t border-line bg-surface px-6 py-20 sm:px-16">
-        <div className="mx-auto max-w-2xl">
-          <h2 className="mb-8 text-2xl font-bold text-fg">Questions people actually ask</h2>
-          <Faq
-            q="Will it send emails without me?"
-            a="No. Generating a draft never sends anything — you always review and press send yourself, one email at a time."
-          />
-          <Faq
-            q="I saw an “unverified app” warning from Google — is that normal?"
-            a="Yes. The Google consent screen is still in testing mode, so you'll see that warning. It's expected, and access is capped at 100 accounts for now."
-          />
-          <Faq
-            q="Do I need to pay for an AI key?"
-            a="No — Google's Gemini API has a free tier that's enough for regular use. You paste your own key into Settings; it's never stored on the server."
-          />
-          <Faq
-            q="Why does it need to read my inbox?"
-            a="Purely to notice replies, so the tool never emails someone who already wrote back. It only ever looks at threads it started."
-          />
-        </div>
-      </section>
-
-      {/* Closing CTA */}
-      <section className="px-6 py-20 sm:px-16" style={{ background: "var(--ink)" }}>
-        <div className="mx-auto flex max-w-2xl flex-col items-center gap-5 text-center">
-          <h2 className="text-3xl font-bold text-white">Stop sending the same email to everyone.</h2>
-          <p className="text-white/70">
-            Sign in with Google and have your first real draft ready in a couple of minutes.
-          </p>
-          <Link href="/login">
-            <button
-              style={{
-                borderRadius: "2rem",
-                padding: "0.75rem 2rem",
-                fontSize: "16px",
-                background: "var(--lime)",
-                color: "var(--ink)",
-                fontWeight: 700,
-              }}
-            >
-              Get started with Google
-            </button>
+        <div className="flex items-center gap-4 text-xs text-muted">
+          <span>Built for people doing their own outreach.</span>
+          <Link href="/login" className="font-medium text-fg underline">
+            Sign in
           </Link>
         </div>
-      </section>
-
-      <footer className="flex flex-col items-center gap-3 px-8 py-8 text-center text-xs text-muted sm:flex-row sm:justify-between sm:px-16">
-        <div className="flex items-center gap-2 font-semibold text-fg">
-          <span className="text-accent">◎</span> Outreach
-        </div>
-        <span>Built for people doing their own outreach.</span>
-        <Link href="/login" className="underline">
-          Sign in
-        </Link>
       </footer>
     </main>
   );
