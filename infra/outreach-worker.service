@@ -1,0 +1,31 @@
+; systemd unit for the arq worker. Install to /etc/systemd/system/ and see
+; DEPLOYMENT.md section 4 for the full procedure.
+;
+; Not containerised on purpose: Postgres and Redis are managed (Neon, Upstash),
+; so this is one Python process with no local dependencies and nothing for a
+; container to isolate it from.
+
+[Unit]
+Description=Outreach arq worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=admin1
+WorkingDirectory=/home/admin1/projects/email/apps/api
+
+; arq crons fire on the process's local clock, and renew_watches (hour=3) and
+; notify_due (hour=8) are written as human hours. Inherit UTC and the "due
+; today" push lands mid-afternoon.
+Environment=TZ=Asia/Kolkata
+
+; Absolute path: uv lives in ~/.local/bin, which is only on an interactive
+; shell's PATH. systemd never needs to find it.
+ExecStart=/home/admin1/projects/email/.venv/bin/arq app.worker.WorkerSettings
+
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

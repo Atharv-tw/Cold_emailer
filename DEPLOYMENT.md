@@ -92,6 +92,74 @@ Run exactly the environment the API runs with. If the worker is down, nothing
 sends and replies go unnoticed - `/ops` reports `worker_running: false` once the
 `tick` heartbeat is older than ten minutes, so alert on that.
 
+Exactly one worker. Two processes against the same database means `tick` fires
+twice every two minutes, and `MAX_SENDS_PER_TICK` is a per-process cap - so a
+second worker silently doubles the send rate past a limiter that was never
+consulted about it. Before starting a worker anywhere, read `worker_heartbeat`:
+a recent `tick` means one is already running somewhere else.
+
+### Running it on a host separate from the API
+
+The worker takes no inbound connections - it only dials out to Postgres and
+Redis - so when both are managed services it needs no reverse proxy, no
+published port, and no container. A systemd unit is enough;
+`infra/outreach-worker.service` is the one in use.
+
+```bash
+uv python install 3.10 && uv venv --python 3.10 .venv
+uv pip install --python .venv -e ./packages/core -e ./apps/api
+```
+
+3.10 explicitly: that is what the suite passes on, and a current Ubuntu ships
+something far newer. The installs are **editable on purpose** - `settings.py`
+derives `REPO_ROOT` from `parents[3]` of its own path to find the root `.env`,
+and a site-packages install resolves that to somewhere inside the interpreter.
+
+Two things about that host's `.env`:
+
+- `WEB_ORIGIN` must be the real web origin. `sync_calendars` writes it into
+  Google Calendar events, so a development value puts dead links in real
+  calendars.
+- Omit `MIGRATION_DATABASE_URL`. The worker never runs Alembic, and that URL is
+  the schema owner - a role that bypasses RLS outright. It has no reason to sit
+  on a machine that only runs jobs.
+
+Confirm before starting, not after. This reaches both services and sends
+nothing - it prints the heartbeat table, which doubles as the check for whether
+a worker is already running elsewhere:
+
+```bash
+cd apps/api && ../../.venv/bin/python -c "
+import asyncio
+from sqlalchemy import text
+from app.db import SessionFactory
+from app.settings import get_settings
+from arq.connections import RedisSettings, create_pool
+
+async def main():
+    async with SessionFactory() as s:
+        for r in (await s.execute(text('select job, at, detail from worker_heartbeat order by at desc'))).all():
+            print(r.job, r.at, '|', r.detail)
+    pool = await create_pool(RedisSettings.from_dsn(get_settings().redis_url))
+    print('redis ping:', await pool.ping())
+
+asyncio.run(main())
+"
+```
+
+Upstash restricts `INFO`, so arq's startup line reports `redis_version=?` and
+`mem_usage=?`. That is cosmetic; `db_keys` coming through means the connection
+is fine. Note that `schedule` is under
+RLS, so an unbound session sees zero rows rather than the truth - count pending
+work with the owner credential from somewhere else, and know how much is
+overdue before you start, or the first few ticks flush the entire backlog at
+once.
+
+Managed Redis is usually billed per command, and arq polls continuously -
+`poll_delay` defaults to 0.5s, so an idle worker issues on the order of 170k
+commands a day doing nothing. Raising it to `5.0` cuts that roughly tenfold and
+costs only a few seconds of enqueue latency, which no job here is sensitive to.
+
 ## 5. Google OAuth
 
 One OAuth client (Web application). The consent screen stays in **testing** mode:
