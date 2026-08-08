@@ -7,33 +7,31 @@ import type { Session } from "next-auth";
 
 import { logout } from "@/app/desktop/(app)/actions";
 import GeminiKeyPill from "@/components/GeminiKeyPill";
+import Icon, { type IconName } from "@/components/Icon";
 import type { Ops } from "@/lib/types";
 
 type ChromeUser = NonNullable<Session["apiUser"]>;
 
-const NAV_ITEMS = [
-  { label: "Dashboard", href: "/dashboard", icon: "⊞" },
-  { label: "Targets", href: "/targets", icon: "👥" },
-  { label: "Sent Emails", href: "/emails", icon: "📤" },
-  { label: "Analytics", href: "/analytics", icon: "📊" },
+const NAV_ITEMS: { label: string; href: string; icon: IconName }[] = [
+  { label: "Dashboard", href: "/dashboard", icon: "grid" },
+  { label: "Targets", href: "/targets", icon: "users" },
+  { label: "Sent Emails", href: "/emails", icon: "send" },
+  { label: "Analytics", href: "/analytics", icon: "chart" },
 ];
 
-const GENERAL_ITEMS = [
-  { label: "Profile", href: "/profile", icon: "🙂" },
-  { label: "Settings", href: "/settings", icon: "⚙️" },
-  { label: "Help", href: "/help", icon: "❔" },
+const GENERAL_ITEMS: { label: string; href: string; icon: IconName }[] = [
+  { label: "Profile", href: "/profile", icon: "user" },
+  { label: "Settings", href: "/settings", icon: "settings" },
+  { label: "Help", href: "/help", icon: "help" },
 ];
 
-function NavLink({ href, icon, label, active }: { href: string; icon: string; label: string; active: boolean }) {
+function NavLink({ href, icon, label, active }: { href: string; icon: IconName; label: string; active: boolean }) {
   return (
-    <Link
-      href={href}
-      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 font-medium whitespace-nowrap transition-colors ${
-        active ? "bg-accent-light text-accent" : "text-muted hover:bg-bg hover:text-fg"
-      }`}
-    >
-      <span className="w-5 shrink-0 text-center">{icon}</span>
-      <span className="opacity-0 transition-opacity duration-150 group-hover:opacity-100">{label}</span>
+    <Link href={href} className={`rail-link ${active ? "rail-link-active" : ""}`} title={label}>
+      <span className="rail-icon">
+        <Icon name={icon} size={19} strokeWidth={active ? 2 : 1.7} />
+      </span>
+      <span className="rail-label">{label}</span>
     </Link>
   );
 }
@@ -41,9 +39,11 @@ function NavLink({ href, icon, label, active }: { href: string; icon: string; la
 /**
  * Sidebar + topbar shell for every authenticated desktop page.
  *
- * The rail is `fixed` and `w-16` at rest, `w-64` on hover - it overlays the
- * page rather than pushing it, because `main` keeps a static `ml-16` that
- * never changes with the rail's hover state.
+ * The rail floats - inset from every edge, rounded, shadowed - rather than
+ * being welded to the viewport, so the ruled paper background reads as one
+ * continuous surface the rail is resting on. It is `fixed` and 68px at rest,
+ * 232px on hover, and it overlays the page rather than pushing it, because
+ * `main` keeps a static left margin that never changes with the hover state.
  */
 export default function DesktopChrome({
   user,
@@ -62,16 +62,26 @@ export default function DesktopChrome({
   const googleDown = ops ? !ops.connected : !user.connected;
 
   return (
-    <div className="min-h-screen bg-bg">
-      <aside className="group fixed left-0 top-0 z-40 flex h-screen w-16 flex-col gap-6 overflow-hidden border-r border-line bg-surface py-8 transition-[width] duration-200 ease-out hover:w-64">
-        <Link href="/dashboard" className="flex items-center gap-3 px-4 text-xl font-bold text-accent">
-          <span className="shrink-0 text-2xl">◎</span>
-          <span className="whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+    <div className="min-h-screen">
+      <aside className="rail group">
+        <Link href="/dashboard" className="flex items-center gap-3 px-2 py-1">
+          <span className="rail-icon">
+            <span
+              className="flex h-7 w-7 items-center justify-center rounded-full text-[13px] font-bold"
+              style={{ background: "var(--lime)", color: "var(--ink)", fontFamily: "var(--font-display)" }}
+            >
+              O
+            </span>
+          </span>
+          <span
+            className="rail-label text-[15px] font-bold whitespace-nowrap text-white"
+            style={{ fontFamily: "var(--font-display)", letterSpacing: "-0.02em" }}
+          >
             Outreach
           </span>
         </Link>
 
-        <nav className="flex flex-col gap-1 px-3">
+        <nav className="flex flex-col gap-1">
           {NAV_ITEMS.map((item) => (
             <NavLink
               key={item.href}
@@ -81,26 +91,25 @@ export default function DesktopChrome({
           ))}
         </nav>
 
-        <div className="mt-auto flex flex-col gap-1 px-3">
+        <div className="mt-auto flex flex-col gap-1">
           {GENERAL_ITEMS.map((item) => (
             <NavLink key={item.href} {...item} active={pathname === item.href} />
           ))}
           <form action={logout}>
-            <button
-              type="submit"
-              className="flex w-full items-center gap-3 rounded-lg bg-transparent px-3 py-2.5 text-left font-medium whitespace-nowrap text-muted transition-colors hover:bg-bg hover:text-fg"
-            >
-              <span className="w-5 shrink-0 text-center">🚪</span>
-              <span className="opacity-0 transition-opacity duration-150 group-hover:opacity-100">Logout</span>
+            <button type="submit" className="rail-link w-full bg-transparent p-[0.65rem] text-left" title="Logout">
+              <span className="rail-icon">
+                <Icon name="logout" size={19} />
+              </span>
+              <span className="rail-label">Logout</span>
             </button>
           </form>
         </div>
       </aside>
 
-      <div className="ml-16 flex min-h-screen flex-col">
-        <header className="flex h-20 items-center justify-end gap-4 px-10">
+      <div className="ml-[100px] flex min-h-screen flex-col pr-4">
+        <header className="flex h-20 items-center justify-end gap-3">
           {(workerDown || googleDown) && (
-            <span className="rounded-full bg-danger-light px-3 py-1 text-xs font-medium text-danger">
+            <span className="rounded-full bg-danger-light px-3 py-1.5 text-xs font-semibold text-danger">
               {workerDown ? "Background worker offline" : "Google disconnected"}
             </span>
           )}
@@ -108,7 +117,7 @@ export default function DesktopChrome({
           <GeminiKeyPill />
 
           <button className="icon-btn" aria-label="Notifications">
-            🔔
+            <Icon name="bell" size={18} />
           </button>
 
           <div className="relative">
@@ -119,7 +128,7 @@ export default function DesktopChrome({
               ) : (
                 <div className="avatar">{initials}</div>
               )}
-              <div className="pr-2 text-left">
+              <div className="pr-1 text-left">
                 <div className="text-[13px] font-semibold text-fg">{user.name || "Signed in"}</div>
                 <div className="text-[11px] text-muted">{user.email}</div>
               </div>
@@ -127,19 +136,19 @@ export default function DesktopChrome({
 
             {profileOpen && (
               <div
-                className="absolute right-0 top-full z-50 mt-2 w-48 rounded-xl border border-line bg-surface p-1.5 shadow-lg"
+                className="absolute right-0 top-full z-50 mt-2 w-48 rounded-2xl bg-surface p-1.5 shadow-lg ring-1 ring-line"
                 onMouseLeave={() => setProfileOpen(false)}
               >
                 <Link
                   href="/profile"
-                  className="block rounded-lg px-3 py-2 text-sm font-medium text-fg hover:bg-bg"
+                  className="block rounded-xl px-3 py-2 text-sm font-medium text-fg hover:bg-paper"
                   onClick={() => setProfileOpen(false)}
                 >
                   Profile
                 </Link>
                 <Link
                   href="/settings"
-                  className="block rounded-lg px-3 py-2 text-sm font-medium text-fg hover:bg-bg"
+                  className="block rounded-xl px-3 py-2 text-sm font-medium text-fg hover:bg-paper"
                   onClick={() => setProfileOpen(false)}
                 >
                   Settings
@@ -147,7 +156,7 @@ export default function DesktopChrome({
                 <form action={logout}>
                   <button
                     type="submit"
-                    className="block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-danger hover:bg-danger-light"
+                    className="block w-full rounded-xl px-3 py-2 text-left text-sm font-medium text-danger hover:bg-danger-light"
                   >
                     Logout
                   </button>
