@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import Icon from "@/components/Icon";
 import PwaSetup from "@/components/PwaSetup";
 import ScheduledStat from "@/components/ScheduledStat";
 import { api } from "@/lib/api";
@@ -60,18 +61,14 @@ export default async function DashboardPage() {
     <>
       <div className="page-header">
         <div>
-          <h1 style={{ fontSize: "28px", fontWeight: "700" }}>Dashboard</h1>
-          <p style={{ marginTop: "0.25rem", color: "var(--muted)" }}>
-            Where your outreach actually stands.
-          </p>
+          <h1>Dashboard</h1>
+          <p>Where your outreach actually stands.</p>
         </div>
         <div className="header-actions">
           <Link href="/targets/new">
-            <button
-              className="primary"
-              style={{ borderRadius: "2rem", padding: "0.5rem 1.25rem", fontWeight: "600" }}
-            >
-              + Add Contact
+            <button className="accent flex items-center gap-1.5">
+              <Icon name="plus" size={17} strokeWidth={2.2} />
+              Add contact
             </button>
           </Link>
         </div>
@@ -79,27 +76,32 @@ export default async function DashboardPage() {
 
       {/* Row 1: replies / sent trend / total contacts */}
       <div className="grid grid-cols-4 gap-5">
-        <div className="dz-card bg-orange text-white">
+        <div className="dz-card dz-card-lime">
           <div className="stat-title">
-            <span className="text-white/80">Total Replies</span>
-            <span className="stat-icon" style={{ borderColor: "rgba(255,255,255,0.5)" }}>
-              ✉
+            <span className="font-semibold">Total replies</span>
+            <span className="stat-icon">
+              <Icon name="mail" size={15} />
             </span>
           </div>
           <div className="stat-value">{replied}</div>
-          <div className="stat-trend text-white/80">
+          <div className="stat-trend" style={{ color: "rgba(10,10,10,0.65)" }}>
             People who wrote back
           </div>
         </div>
 
         <div className="dz-card col-span-2">
           <div className="stat-title">
-            <span className="text-muted">Sent, last 30 days</span>
-            <span className="text-fg font-semibold">{sentThisPeriod}</span>
+            <span className="eyebrow">Sent · last 30 days</span>
+            <span
+              className="text-fg"
+              style={{ fontFamily: "var(--font-display)", fontSize: "20px", fontWeight: 700, letterSpacing: "-0.03em" }}
+            >
+              {sentThisPeriod}
+            </span>
           </div>
           <svg viewBox="0 0 320 72" className="mt-auto h-16 w-full" preserveAspectRatio="none">
-            <path d={areaPath} fill="var(--accent-light)" stroke="none" />
-            <path d={linePath} fill="none" stroke="var(--accent)" strokeWidth="2" />
+            <path d={areaPath} fill="var(--lime)" fillOpacity="0.45" stroke="none" />
+            <path d={linePath} fill="none" stroke="var(--ink)" strokeWidth="2" strokeLinejoin="round" />
           </svg>
         </div>
 
@@ -108,16 +110,16 @@ export default async function DashboardPage() {
             className="donut-container"
             style={{
               borderRadius: "50%",
-              background: `conic-gradient(var(--lime) ${reachedPercent}%, rgba(255,255,255,0.15) 0)`,
+              background: `conic-gradient(var(--lime) ${reachedPercent}%, rgba(255,255,255,0.14) 0)`,
             }}
           >
             <div style={{ position: "absolute", inset: "15px", background: "var(--ink)", borderRadius: "50%" }} />
             <div className="donut-text">
               <h4 style={{ color: "var(--lime)" }}>{totalContacts}</h4>
-              <span style={{ color: "rgba(255,255,255,0.75)" }}>Contacts</span>
+              <span style={{ color: "rgba(255,255,255,0.7)" }}>Contacts</span>
             </div>
           </div>
-          <p className="mt-3 text-xs" style={{ color: "rgba(255,255,255,0.75)" }}>
+          <p className="mt-2 text-xs" style={{ color: "rgba(255,255,255,0.7)" }}>
             {reachedPercent}% reached at least once
           </p>
         </div>
@@ -126,10 +128,14 @@ export default async function DashboardPage() {
       {/* Row 2: recently contacted / scheduled */}
       <div className="grid grid-cols-4 gap-5">
         <div className="dz-card col-span-3">
-          <div className="mb-4 flex items-center justify-between">
-            <h2>Recently Contacted</h2>
-            <Link href="/targets" className="text-xs font-medium text-accent">
+          <div className="mb-3 flex items-center justify-between">
+            <h2>Recently contacted</h2>
+            <Link
+              href="/targets"
+              className="flex items-center gap-1 rounded-full bg-paper px-3 py-1.5 text-xs font-semibold text-fg transition-colors hover:bg-cream"
+            >
               View all
+              <Icon name="arrow-right" size={13} strokeWidth={2} />
             </Link>
           </div>
           {recentlyContacted.length === 0 ? (
@@ -138,7 +144,7 @@ export default async function DashboardPage() {
             <div className="flex flex-col">
               {recentlyContacted.map((target) => (
                 <Link key={target.id} href={`/targets/${target.id}`} className="list-item">
-                  <div className="list-icon" style={{ background: "var(--accent-light)", color: "var(--accent)" }}>
+                  <div className="list-icon">
                     {(target.name || target.email).charAt(0).toUpperCase()}
                   </div>
                   <div className="list-content">
@@ -159,15 +165,15 @@ export default async function DashboardPage() {
 
       {/* Row 3: reply tracker */}
       <div className="dz-card">
-        <h2 style={{ marginBottom: "1rem" }}>Reply Tracker</h2>
+        <h2 style={{ marginBottom: "0.75rem" }}>Reply tracker</h2>
         {data.replies.length === 0 ? (
           <p className="muted">No replies yet.</p>
         ) : (
           <div className="flex flex-col">
             {data.replies.map((reply) => (
               <Link key={`${reply.target_id}-${reply.at}`} href={`/targets/${reply.target_id}`} className="list-item">
-                <div className="list-icon" style={{ background: "var(--accent-light)", color: "var(--accent)" }}>
-                  ✉
+                <div className="list-icon">
+                  <Icon name="mail" size={16} />
                 </div>
                 <div className="list-content">
                   <div className="list-title">{reply.name || "Someone"}</div>
