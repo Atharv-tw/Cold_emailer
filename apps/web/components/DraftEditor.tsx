@@ -168,8 +168,35 @@ export default function DraftEditor({
           Save draft
         </button>
 
+        {/* Sending in the window is the recommended path - it respects the
+            sending hours, the per-user gap and the daily cap. It gets the
+            accent; sending now bypasses all three, so it stays calm. */}
         <button
           type="button"
+          className="accent"
+          disabled={pending || !body.trim()}
+          onClick={() =>
+            run(async () => {
+              await saveDraft(target.id, subject, body);
+              const result = await scheduleSend(target.id);
+              setStatus(
+                result.scheduled_for
+                  ? `Queued for ${new Date(result.scheduled_for).toLocaleString(undefined, {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    })}.`
+                  : "Queued.",
+              );
+              router.refresh();
+            })
+          }
+        >
+          Send in my next window
+        </button>
+
+        <button
+          type="button"
+          className="secondary"
           disabled={pending || !body.trim()}
           onClick={() =>
             run(async () => {
@@ -182,26 +209,6 @@ export default function DraftEditor({
           }
         >
           Send now
-        </button>
-
-        <button
-          type="button"
-          className="quiet"
-          disabled={pending || !body.trim()}
-          onClick={() =>
-            run(async () => {
-              await saveDraft(target.id, subject, body);
-              const result = await scheduleSend(target.id);
-              setStatus(
-                result.scheduled_for
-                  ? `Queued for ${new Date(result.scheduled_for).toLocaleString()}.`
-                  : "Queued.",
-              );
-              router.refresh();
-            })
-          }
-        >
-          Send in my next window
         </button>
       </section>
     </div>
