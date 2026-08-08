@@ -25,10 +25,10 @@ import type { Disclosure, Profile, Project, Experience, SessionUser } from "@/li
  * fills the form and marks every field it touched rather than writing to the
  * profile.
  *
- * The disclosure is one line at the point of upload, with the full text one
- * click away behind the info button - the earlier version put six lines of
- * legal-sounding copy above the control, which is the reliable way to get
- * something skimmed past rather than read.
+ * The disclosure lives behind the info button beside the card title, rather
+ * than as six lines of legal-sounding copy stacked above the upload control -
+ * which is the reliable way to get something skimmed past rather than read.
+ * The long version is on the help page at #resume.
  *
  * And there is exactly one save button on the page. It lives in a bar that
  * follows you down the screen and only lights up when there is something to
