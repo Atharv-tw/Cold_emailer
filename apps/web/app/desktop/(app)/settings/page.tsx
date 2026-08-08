@@ -11,8 +11,8 @@ export default async function SettingsPage() {
     <>
       <div className="page-header">
         <div>
-          <h1 style={{ fontSize: "28px", fontWeight: "700" }}>Settings</h1>
-          <p style={{ marginTop: "0.25rem", color: "var(--muted)" }}>
+          <h1>Settings</h1>
+          <p>
             Your AI key, your Google connection, and account-level controls.
           </p>
         </div>

@@ -15,8 +15,8 @@ export default async function NewTargetPage() {
       <>
         <div className="page-header">
           <div>
-            <h1 style={{ fontSize: "28px", fontWeight: "700" }}>Action Required</h1>
-            <p style={{ marginTop: "0.25rem", color: "var(--muted)" }}>
+            <h1>Action Required</h1>
+            <p>
               Complete your profile before adding contacts.
             </p>
           </div>
@@ -45,8 +45,8 @@ export default async function NewTargetPage() {
     <>
       <div className="page-header">
         <div>
-          <h1 style={{ fontSize: "28px", fontWeight: "700" }}>Add Contact</h1>
-          <p style={{ marginTop: "0.25rem", color: "var(--muted)" }}>
+          <h1>Add Contact</h1>
+          <p>
             Answer these questions and the email will be drafted automatically.
           </p>
         </div>

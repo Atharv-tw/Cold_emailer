@@ -34,8 +34,8 @@ export default async function TargetPage({
     <>
       <div className="page-header">
         <div>
-          <h1 style={{ fontSize: "28px", fontWeight: "700" }}>{target.name || target.email}</h1>
-          <p style={{ marginTop: "0.25rem", color: "var(--muted)" }}>
+          <h1>{target.name || target.email}</h1>
+          <p>
             {target.email}
             {target.company && ` · ${target.company}`}
             {target.role && ` · ${target.role}`}

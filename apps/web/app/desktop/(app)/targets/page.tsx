@@ -53,8 +53,8 @@ export default async function TargetsPage({
     <>
       <div className="page-header">
         <div>
-          <h1 style={{ fontSize: "28px", fontWeight: "700" }}>Contacts</h1>
-          <p style={{ marginTop: "0.25rem", color: "var(--muted)" }}>
+          <h1>Contacts</h1>
+          <p>
             {targets.length} {targets.length === 1 ? "person" : "people"} match these filters
           </p>
         </div>

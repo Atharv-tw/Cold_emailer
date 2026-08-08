@@ -17,8 +17,8 @@ export default async function AnalyticsPage() {
     <>
       <div className="page-header">
         <div>
-          <h1 style={{ fontSize: "28px", fontWeight: "700" }}>Analytics</h1>
-          <p style={{ marginTop: "0.25rem", color: "var(--muted)" }}>
+          <h1>Analytics</h1>
+          <p>
             {t.sent} sent · {t.contacted} people contacted · {t.replied} replied
           </p>
         </div>

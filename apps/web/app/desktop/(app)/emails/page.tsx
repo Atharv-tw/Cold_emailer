@@ -45,8 +45,8 @@ export default async function EmailsPage() {
     <>
       <div className="page-header">
         <div>
-          <h1 style={{ fontSize: "28px", fontWeight: "700" }}>Sent Emails</h1>
-          <p style={{ marginTop: "0.25rem", color: "var(--muted)" }}>
+          <h1>Sent Emails</h1>
+          <p>
             {messages.length} email{messages.length === 1 ? "" : "s"} across everyone you&rsquo;ve contacted
           </p>
         </div>
