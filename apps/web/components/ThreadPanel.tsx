@@ -66,7 +66,16 @@ export default function ThreadPanel({ messages }: { messages: ThreadMessage[] })
               className="quiet w-full"
               aria-expanded={expanded}
               onClick={() => setOpen(expanded ? null : message.step)}
-              style={{ display: "block", textAlign: "left", padding: "0.75rem 1rem" }}
+              // Square, not the base button rule's 999px pill: this fills the
+              // tile edge to edge, so a pill-shaped hover would sit visibly
+              // inside a square-cornered container. The wrapper's overflow
+              // hidden rounds the top corners back for the first row.
+              style={{
+                display: "block",
+                textAlign: "left",
+                padding: "0.75rem 1rem",
+                borderRadius: 0,
+              }}
             >
               <span className="flex items-center justify-between gap-2">
                 <span className="badge badge-completed">Touch {message.step}</span>

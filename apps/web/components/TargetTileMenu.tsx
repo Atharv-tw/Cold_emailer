@@ -130,9 +130,13 @@ export default function TargetTileMenu({ target }: { target: Target }) {
 
       {open && (
         <div className="dz-card absolute right-0 z-20 mt-1 w-40 gap-1 p-1 shadow-md">
+          {/* Square-ish, not the base rule's 999px: these run the full width
+              of the menu, and a capsule hover inside a rounded card reads as
+              a different shape sitting on top of it rather than part of it. */}
           <button
             type="button"
-            className="quiet small w-full justify-start text-left"
+            className="quiet small w-full text-left"
+            style={{ display: "block", borderRadius: "var(--radius-sm)" }}
             onClick={(event) => {
               stop(event);
               setOpen(false);
@@ -143,7 +147,8 @@ export default function TargetTileMenu({ target }: { target: Target }) {
           </button>
           <button
             type="button"
-            className="quiet small w-full justify-start text-left text-danger"
+            className="quiet small w-full text-left text-danger"
+            style={{ display: "block", borderRadius: "var(--radius-sm)" }}
             onClick={(event) => {
               stop(event);
               setOpen(false);
