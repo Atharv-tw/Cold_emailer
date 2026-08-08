@@ -4,9 +4,26 @@ Narrow on purpose. PDF and DOCX only, text layer only, no OCR. A scanned CV
 is a real thing people have, and the honest answer is "this cannot read that"
 rather than an empty profile the user discovers three emails later.
 
-That failure mode is the reason for the length floor below: pypdf will happily
-return a handful of stray characters from a page of images and report success,
-and a profile silently built from nothing is worse than an upload that failed.
+That failure mode is the reason for the length floor below: an extractor will
+happily return a handful of stray characters from a page of images and report
+success, and a profile silently built from nothing is worse than an upload
+that failed.
+
+PDF extraction goes through pdfplumber with `layout=True` rather than the
+obvious `pypdf.extract_text()`, and the reason is worth writing down because
+the obvious choice looks fine until you feed it a real CV. Resumes are
+overwhelmingly exported from design tools, which place every glyph
+individually; pypdf then puts a space between each one and hands the model
+"A T H A R V  T I W A R I" - on one real resume, 98% of the tokens it
+produced were single characters. The model spends its attention
+re-segmenting words instead of reading, and the parse becomes a coin flip.
+
+The same call also fixes reading order. Two-column CVs come out of pypdf in
+content-stream order, which scatters the skills block hundreds of lines away
+from the projects it belongs to, so per-project tech comes back empty. Keeping
+the layout means the column geometry survives as whitespace and the model can
+see there are two columns - which is why `_clean_layout` below is careful not
+to collapse runs of spaces the way the DOCX path does.
 """
 
 from __future__ import annotations
@@ -49,38 +66,62 @@ def _clean(text: str) -> str:
     return text.strip()[:MAX_EXTRACTED_CHARS]
 
 
+def _clean_layout(text: str) -> str:
+    """Tidy layout-preserved text without flattening the columns.
+
+    Deliberately does not collapse runs of spaces, which is the one thing
+    `_clean` does that would undo the extraction: on a two-column CV those runs
+    are all that tells the model the achievements list is a sidebar and not a
+    continuation of the summary. Trailing padding carries no such signal, so it
+    goes - on a one-page resume that is a fifth of the characters for nothing.
+    """
+    text = text.replace("\x00", " ")
+    lines = [line.rstrip() for line in text.split("\n")]
+
+    kept: list[str] = []
+    for line in lines:
+        # One blank line separates blocks; a run of them is just page air.
+        if not line and (not kept or not kept[-1]):
+            continue
+        kept.append(line)
+
+    return "\n".join(kept).strip()[:MAX_EXTRACTED_CHARS]
+
+
 def _extract_pdf(data: bytes) -> Extracted:
-    from pypdf import PdfReader
-    from pypdf.errors import PdfReadError
+    import pdfplumber
+    from pdfminer.pdfdocument import PDFPasswordIncorrect
+    from pdfminer.pdfparser import PDFSyntaxError
 
     try:
-        reader = PdfReader(io.BytesIO(data))
-    except PdfReadError as exc:
+        pdf = pdfplumber.open(io.BytesIO(data))
+    except PDFPasswordIncorrect as exc:
+        # pdfplumber retries with an empty password itself, so getting here
+        # means a real one rather than "protected but not really".
         raise ResumeError(
-            "That PDF could not be opened - it may be corrupted or password "
-            "protected. Try re-exporting it."
+            "That PDF is password protected. Remove the password and upload it "
+            "again."
+        ) from exc
+    except (PDFSyntaxError, ValueError, TypeError) as exc:
+        raise ResumeError(
+            "That PDF could not be opened - it may be corrupted. Try "
+            "re-exporting it."
         ) from exc
 
-    if reader.is_encrypted:
-        # An empty-password decrypt covers "protected but not really".
-        try:
-            if reader.decrypt("") == 0:
-                raise ResumeError(
-                    "That PDF is password protected. Remove the password and "
-                    "upload it again."
-                )
-        except NotImplementedError as exc:
-            raise ResumeError("That PDF uses an encryption this cannot read.") from exc
+    with pdf:
+        total = len(pdf.pages)
+        chunks = []
+        for page in pdf.pages[:MAX_PAGES]:
+            try:
+                # layout=True is what keeps words whole and columns aligned.
+                # The flat call is the fallback rather than pypdf because
+                # either way pdfplumber groups glyphs into words first, which
+                # is the half of the problem that actually broke parsing.
+                chunks.append(page.extract_text(layout=True) or page.extract_text() or "")
+            except Exception:  # noqa: BLE001 - one bad page should not lose the rest
+                continue
 
-    pages = reader.pages[:MAX_PAGES]
-    chunks = []
-    for page in pages:
-        try:
-            chunks.append(page.extract_text() or "")
-        except Exception:  # noqa: BLE001 - one bad page should not lose the rest
-            continue
-
-    return Extracted(text=_clean("\n".join(chunks)), pages=len(reader.pages), kind="pdf")
+    return Extracted(text=_clean_layout("\n".join(chunks)), pages=total, kind="pdf")
 
 
 def _extract_docx(data: bytes) -> Extracted:

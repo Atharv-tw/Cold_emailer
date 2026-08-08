@@ -1,10 +1,16 @@
 """Resume extraction, parsing, storage and the completeness gate.
 
-The case that matters most here is the one that fails quietly everywhere else:
-a scanned CV with no text layer. pypdf returns a few stray characters and
+The cases that matter most here are the two that fail quietly everywhere else.
+
+A scanned CV with no text layer: extraction returns a few stray characters and
 reports success, the model dutifully invents a profile from nothing, and the
-user finds out three emails later. So the failure is asserted, not the
-happy path alone.
+user finds out three emails later. So the failure is asserted, not the happy
+path alone.
+
+And a design-tool export, which is what most real resumes are: the text layer
+is there, but every glyph is placed individually, so a naive read produces
+character soup that parses to an almost-empty profile. Both are asserted below
+because neither one looks like an error from the outside.
 """
 
 from __future__ import annotations
@@ -52,15 +58,17 @@ def make_pdf(lines: list[str]) -> bytes:
     content = "BT /F1 12 Tf 72 720 Td 14 TL\n"
     content += "".join(f"({escape(line)}) Tj T*\n" for line in lines)
     content += "ET"
-    stream = content.encode("latin-1")
+    return _assemble_pdf(content.encode("latin-1"))
 
+
+def _assemble_pdf(stream: bytes, base_font: bytes = b"Helvetica") -> bytes:
     objects = [
         b"<< /Type /Catalog /Pages 2 0 R >>",
         b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
         b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
         b"/Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
         b"<< /Length " + str(len(stream)).encode() + b" >>\nstream\n" + stream + b"\nendstream",
-        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /" + base_font + b" >>",
     ]
 
     out = bytearray(b"%PDF-1.4\n")
@@ -76,6 +84,34 @@ def make_pdf(lines: list[str]) -> bytes:
         out += f"{offset:010d} 00000 n \n".encode()
     out += f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_at}\n%%EOF\n".encode()
     return bytes(out)
+
+
+def make_glyph_positioned_pdf(lines: list[str]) -> bytes:
+    """A PDF that places every glyph individually, the way design tools export.
+
+    This is what a real resume looks like, and it is the case that broke
+    parsing: an extractor that reads the content stream naively puts a space
+    between every character and hands the model "D a n a  S h a r m a". The
+    glyphs here are laid out on the same baselines as `make_pdf`, so anything
+    that groups them by position gets the same words back.
+    """
+    def escape(text: str) -> str:
+        return text.replace("\\", r"\\").replace("(", r"\(").replace(")", r"\)")
+
+    # Courier, because it is the one base-14 font whose advance width really is
+    # uniform (600/1000 em, so 7.2pt at 12pt). Laying Helvetica out on a fixed
+    # pitch would leave false gaps after narrow glyphs like "i" and test the
+    # fixture's arithmetic rather than the extractor.
+    parts = []
+    y = 720
+    for line in lines:
+        x = 72.0
+        for char in line:
+            if char != " ":
+                parts.append(f"BT /F1 12 Tf {x:.1f} {y} Td ({escape(char)}) Tj ET\n")
+            x += 7.2
+        y -= 14
+    return _assemble_pdf("".join(parts).encode("latin-1"), base_font=b"Courier")
 
 
 def make_docx(lines: list[str]) -> bytes:
@@ -121,8 +157,23 @@ class TestExtraction(unittest.TestCase):
         self.assertIn("ExampleCorp", extracted.text)
         self.assertIn("Senior Engineer", extracted.text)
 
+    def test_glyph_positioned_pdf_comes_back_as_words(self):
+        # The regression this extractor exists for. A design-tool export places
+        # every glyph separately; read naively it arrives as "D a n a", and the
+        # model spends its attention re-segmenting words instead of reading.
+        extracted = extract_text(make_glyph_positioned_pdf(RESUME_LINES), "designed.pdf")
+
+        self.assertIn("Dana Sharma", extracted.text)
+        self.assertIn("ExampleCorp", extracted.text)
+
+        tokens = extracted.text.split()
+        singles = sum(1 for token in tokens if len(token) == 1)
+        # On a real resume the naive read gave 98% single-character tokens, so
+        # the assertion is about the shape of the failure, not one string.
+        self.assertLess(singles / len(tokens), 0.2)
+
     def test_image_only_pdf_fails_loudly(self):
-        # A page with no text operators - what a scan looks like to pypdf.
+        # A page with no text operators - what a scan looks like.
         with self.assertRaises(ResumeError) as ctx:
             extract_text(make_pdf([]), "scan.pdf")
         message = str(ctx.exception)
