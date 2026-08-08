@@ -43,6 +43,12 @@ Hard rules:
   paste a raw URL with no lead-in - name what it is ("a two-minute demo of
   it", "the live site") before it.
 - No subject-line gimmicks, no "quick question", no false familiarity.
+- The subject must carry the sender's intent, not only the recipient's topic.
+  A subject that names only their subject matter reads like a newsletter or a
+  report title, and gives no reason to open it. Pair the specific thing with
+  what the sender wants - "AI engineering intern - your inference cost post"
+  rather than "Inference cost optimization at Aztech". Keep it under about 60
+  characters and never write it as a sentence with a full stop.
 - No filler openers ("I hope this email finds you", "I came across your
   profile", "I wanted to reach out").
 - No spam-trigger phrasing: act now, limited time, guarantee, 100%, urgent.
