@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import DraftEditor from "@/components/DraftEditor";
+import ThreadPanel from "@/components/ThreadPanel";
 import { api } from "@/lib/api";
 import { requireAuth } from "@/lib/auth-guard";
 import type { Draft, EmailTemplate, Target, TargetDetail } from "@/lib/types";
@@ -74,36 +75,21 @@ export default async function TargetPage({
             </div>
           )}
 
-          <div className="dz-card" style={{ padding: "1.5rem" }}>
+          <div id="compose" className="dz-card" style={{ padding: "1.5rem" }}>
             <h2 style={{ marginBottom: "1.5rem" }}>Compose</h2>
-            <DraftEditor target={target} initial={draft} templates={templates} />
+            <DraftEditor
+              target={target}
+              initial={draft}
+              templates={templates}
+              queuedFor={detail.queued_for}
+            />
           </div>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
           <div className="dz-card">
             <h2 style={{ marginBottom: "1.5rem" }}>Thread</h2>
-            {detail.messages.length === 0 ? (
-              <p className="muted">Nothing sent yet.</p>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                {detail.messages.map((message) => (
-                  <div key={message.step} style={{ border: "1px solid var(--line)", borderRadius: "var(--radius-md)", padding: "1rem" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
-                      <span className="badge badge-completed">Touch {message.step}</span>
-                      <span style={{ fontSize: "12px", color: "var(--muted)" }}>
-                        {message.status} {message.sent_at && `· ${new Date(message.sent_at).toLocaleString()}`}
-                      </span>
-                    </div>
-                    <strong style={{ display: "block", marginBottom: "0.5rem", fontSize: "14px" }}>{message.subject}</strong>
-                    <pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", fontSize: "13px", color: "var(--muted)", margin: 0 }}>
-                      {message.body}
-                    </pre>
-                    {message.error && <p style={{ color: "var(--danger)", marginTop: "0.5rem", fontSize: "12px" }}>{message.error}</p>}
-                  </div>
-                ))}
-              </div>
-            )}
+            <ThreadPanel messages={detail.messages} />
           </div>
 
           <div className="dz-card">

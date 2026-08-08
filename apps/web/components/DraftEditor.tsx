@@ -3,9 +3,23 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { generateDraft, saveDraft, scheduleSend, sendNow } from "@/app/desktop/(app)/dashboard/actions";
+import {
+  cancelScheduledSend,
+  generateDraft,
+  saveDraft,
+  scheduleSend,
+  sendNow,
+} from "@/app/desktop/(app)/dashboard/actions";
 import { useGeminiKey } from "@/lib/useGeminiKey";
 import type { Draft, EmailTemplate, Target } from "@/lib/types";
+
+/** Send times carry seconds so they do not look automated; nobody needs to see that. */
+function when(value: string): string {
+  return new Date(value).toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
 
 /**
  * Write, check, send.
@@ -19,14 +33,24 @@ export default function DraftEditor({
   target,
   initial,
   templates,
+  queuedFor = null,
 }: {
   target: Target;
   initial: Draft | null;
   templates: EmailTemplate[];
+  /** When this draft is due to go out, or null if it is not queued. */
+  queuedFor?: string | null;
 }) {
   const router = useRouter();
   const [subject, setSubject] = useState(initial?.subject ?? "");
   const [body, setBody] = useState(initial?.body ?? "");
+  // What is actually stored, so Discard has something to go back to. Moves
+  // forward on every save and on every generation, because at that point the
+  // stored copy is the new baseline.
+  const [saved, setSaved] = useState({
+    subject: initial?.subject ?? "",
+    body: initial?.body ?? "",
+  });
   const [warnings, setWarnings] = useState<string[]>(initial?.warnings ?? []);
   const [instruction, setInstruction] = useState("");
   const [templateKey, setTemplateKey] = useState(templates[0]?.key ?? "specific_hook");
@@ -37,6 +61,7 @@ export default function DraftEditor({
 
   const step = (initial?.step ?? target.touches_sent + 1) || 1;
   const isFollowUp = step > 1;
+  const unsaved = subject !== saved.subject || body !== saved.body;
 
   function run(work: () => Promise<void>) {
     setError("");
@@ -100,7 +125,7 @@ export default function DraftEditor({
         </label>
         <button
           type="button"
-          className="quiet"
+          className="secondary"
           disabled={pending || !hasGeminiKey}
           title={hasGeminiKey ? undefined : "Add your Gemini API key in Settings first"}
           onClick={() =>
@@ -109,6 +134,7 @@ export default function DraftEditor({
               const draft = await generateDraft(target.id, instruction, templateKey, geminiKey);
               setSubject(draft.subject);
               setBody(draft.body);
+              setSaved({ subject: draft.subject, body: draft.body });
               setWarnings(draft.warnings);
               setStatus("Written. Read it before you send it.");
             })
@@ -149,6 +175,16 @@ export default function DraftEditor({
         </div>
       )}
 
+      {queuedFor && (
+        <div className="note">
+          <strong>Queued for {when(queuedFor)}.</strong>
+          <p className="muted">
+            Edit the text above and save, and that is what goes out — the time
+            only changes if you reschedule.
+          </p>
+        </div>
+      )}
+
       {status && <p className="ok">{status}</p>}
       {error && <p className="error">{error}</p>}
 
@@ -160,13 +196,37 @@ export default function DraftEditor({
           onClick={() =>
             run(async () => {
               const draft = await saveDraft(target.id, subject, body);
+              setSaved({ subject, body });
               setWarnings(draft.warnings);
-              setStatus("Saved as a draft. Nothing has been sent.");
+              setStatus(
+                queuedFor
+                  ? "Saved. This is what goes out at the queued time."
+                  : "Saved as a draft. Nothing has been sent.",
+              );
             })
           }
         >
-          Save draft
+          {queuedFor ? "Save edit" : "Save draft"}
         </button>
+
+        {/* Only offered when it would do something. A Discard that is always
+            there invites the question of what it discards when nothing has
+            changed - and the honest answer would be "nothing". */}
+        {unsaved && (
+          <button
+            type="button"
+            className="quiet"
+            disabled={pending}
+            onClick={() => {
+              setSubject(saved.subject);
+              setBody(saved.body);
+              setStatus("Reverted to the last saved version.");
+              setError("");
+            }}
+          >
+            Discard changes
+          </button>
+        )}
 
         {/* Sending in the window is the recommended path - it respects the
             sending hours, the per-user gap and the daily cap. It gets the
@@ -180,19 +240,31 @@ export default function DraftEditor({
               await saveDraft(target.id, subject, body);
               const result = await scheduleSend(target.id);
               setStatus(
-                result.scheduled_for
-                  ? `Queued for ${new Date(result.scheduled_for).toLocaleString(undefined, {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    })}.`
-                  : "Queued.",
+                result.scheduled_for ? `Queued for ${when(result.scheduled_for)}.` : "Queued.",
               );
               router.refresh();
             })
           }
         >
-          Send in my next window
+          {queuedFor ? "Pick a new time" : "Send in my next window"}
         </button>
+
+        {queuedFor && (
+          <button
+            type="button"
+            className="quiet"
+            disabled={pending}
+            onClick={() =>
+              run(async () => {
+                await cancelScheduledSend(target.id);
+                setStatus("Taken out of the queue. The draft is still here.");
+                router.refresh();
+              })
+            }
+          >
+            Cancel send
+          </button>
+        )}
 
         <button
           type="button"

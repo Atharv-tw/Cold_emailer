@@ -28,6 +28,21 @@ export async function createTarget(payload: unknown): Promise<Target> {
   return target;
 }
 
+/**
+ * Everything optional, and never the address: changing that would carry the
+ * verification result, the touch count and the Gmail thread over to a
+ * different person. The API refuses it too.
+ */
+export async function updateTarget(id: string, payload: unknown): Promise<Target> {
+  const target = await api<Target>(`/v1/targets/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+  revalidatePath("/targets");
+  revalidatePath(`/targets/${id}`);
+  return target;
+}
+
 export async function deleteTarget(id: string): Promise<void> {
   await api<void>(`/v1/targets/${id}`, { method: "DELETE" });
   revalidatePath("/targets");
@@ -78,4 +93,11 @@ export async function scheduleSend(id: string): Promise<SendResult> {
   revalidatePath("/dashboard");
   revalidatePath(`/targets/${id}`);
   return result;
+}
+
+/** Take a queued email back out of the queue. The draft itself is untouched. */
+export async function cancelScheduledSend(id: string): Promise<void> {
+  await api<void>(`/v1/targets/${id}/schedule`, { method: "DELETE" });
+  revalidatePath("/dashboard");
+  revalidatePath(`/targets/${id}`);
 }
