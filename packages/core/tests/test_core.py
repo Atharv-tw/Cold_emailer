@@ -28,7 +28,7 @@ from outreach_core.limits import (  # noqa: E402
     WarmupPolicy, may_schedule_touch, recipient_key, remaining_touches,
 )
 from outreach_core.mime import (  # noqa: E402
-    Outgoing, SenderIdentity, build_message, extend_references, to_gmail_raw,
+    Outgoing, SenderIdentity, build_message, extend_references, signature, to_gmail_raw,
 )
 from outreach_core.scheduling import (  # noqa: E402
     ScheduleError, SendingWindow, next_sending_day, schedule_step,
@@ -426,6 +426,57 @@ class TestMime(unittest.TestCase):
         import base64
 
         self.assertIn(b"Subject: Hi", base64.urlsafe_b64decode(raw))
+
+
+class TestSignature(unittest.TestCase):
+    def test_nothing_configured_appends_nothing(self):
+        """An empty profile must not put a bare separator on every email."""
+        self.assertEqual(signature("", {}), "")
+        self.assertEqual(signature("   ", {"portfolio": "  "}), "")
+
+    def test_portfolio_and_name_only(self):
+        self.assertEqual(
+            signature("Dana", {"portfolio": "https://dana.dev"}),
+            "\n\nDana\nPortfolio: https://dana.dev",
+        )
+
+    def test_exactly_one_link_even_when_several_qualify(self):
+        """The body already spends the one URL a cold email can afford."""
+        block = signature(
+            "Dana",
+            {
+                "portfolio": "https://p",
+                "linkedin": "https://l",
+                "github": "https://g",
+                "resume": "https://r",
+            },
+        )
+        self.assertEqual(block.count("http"), 1)
+        self.assertIn("Portfolio: https://p", block)
+
+    def test_falls_back_through_the_chain_in_order(self):
+        links = {"linkedin": "https://l", "github": "https://g", "resume": "https://r"}
+        self.assertIn("LinkedIn: https://l", signature("", links))
+        self.assertIn("GitHub: https://g", signature("", {k: v for k, v in links.items() if k != "linkedin"}))
+        self.assertIn("Resume: https://r", signature("", {"resume": "https://r"}))
+
+    def test_other_is_never_used(self):
+        """An unlabelled link is not worth the single slot."""
+        self.assertEqual(signature("Dana", {"other": "https://x"}), "\n\nDana")
+
+    def test_name_only_when_every_link_is_empty(self):
+        self.assertEqual(
+            signature("Dana", {"portfolio": "", "linkedin": "", "github": "", "resume": ""}),
+            "\n\nDana",
+        )
+
+    def test_key_matching_ignores_case(self):
+        """Profile keys are typed by hand, so "Portfolio" must work too."""
+        self.assertIn("Portfolio: https://p", signature("", {"Portfolio": "https://p"}))
+
+    def test_no_rfc3676_delimiter(self):
+        """Gmail hides what follows "--", which is exactly what this shows."""
+        self.assertNotIn("--", signature("Dana", {"portfolio": "https://dana.dev"}))
 
 
 # ----------------------------------------------------------- classification

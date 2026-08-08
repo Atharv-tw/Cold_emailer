@@ -22,7 +22,13 @@ from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import func, select
 
 from outreach_core.limits import MAX_TOUCHES, WarmupPolicy, may_schedule_touch
-from outreach_core.mime import Outgoing, SenderIdentity, build_message, extend_references
+from outreach_core.mime import (
+    Outgoing,
+    SenderIdentity,
+    build_message,
+    extend_references,
+    signature,
+)
 from outreach_core.scheduling import SendingWindow, local_day_bounds, schedule_step
 from outreach_core.templating import render_draft
 
@@ -227,11 +233,19 @@ async def send_one(
         {},
         thread_subject=target.thread_subject or None,
     )
+    # First touch only. A follow-up replies inside the same thread, where the
+    # signature is already sitting two messages up - repeating it under a note
+    # meant to be two lines long is most of the follow-up.
+    #
+    # Appended here rather than stored on the draft, so editing a draft can
+    # never leave a stale copy in the body and re-sending cannot append twice.
+    sig = signature(user.name or "", profile.links or {}) if message.step == 1 else ""
+
     identity = SenderIdentity(email=user.email, from_name=user.name or user.email)
     outgoing = Outgoing(
         to_email=target.email,
         subject=rendered.subject,
-        body=rendered.body,
+        body=rendered.body + sig,
         in_reply_to=target.last_message_id or None,
         references=target.thread_refs or "",
     )

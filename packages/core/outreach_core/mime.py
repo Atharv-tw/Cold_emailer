@@ -15,9 +15,55 @@ a header, because a person writing to one other person doesn't have a list.
 from __future__ import annotations
 
 import base64
+from collections.abc import Mapping
 from dataclasses import dataclass
 from email.message import EmailMessage
 from email.utils import formataddr, formatdate
+
+# Which profile link may appear in the signature, in order of preference. One
+# only, and the first match wins. The body is already allowed a URL, and every
+# additional link in a one-to-one email is another thing a filter counts and
+# another place for the reader's attention to go instead of the reply.
+#
+# The order is what each link proves about a stranger, best first: a portfolio
+# is curated and shows finished work, a LinkedIn is the conventional fallback,
+# a GitHub is raw but real, and a resume is the last resort because it asks the
+# reader to download something. `other` is deliberately absent - an unlabelled
+# link is not worth the one slot.
+SIGNATURE_LINK_KEYS = (
+    ("portfolio", "Portfolio"),
+    ("linkedin", "LinkedIn"),
+    ("github", "GitHub"),
+    ("resume", "Resume"),
+)
+
+
+def signature(name: str, links: Mapping[str, str]) -> str:
+    """The sender's own block, appended after the body at send time.
+
+    Deliberately not something the model writes. The generation prompt allows
+    exactly one URL in the body so the email argues for itself instead of
+    reading as a link dump - if the signature were part of what was generated,
+    the model would spend that single allowance on a profile page.
+
+    No "--" delimiter: it is the RFC 3676 convention, but Gmail collapses what
+    follows it behind an ellipsis, which hides the link this exists to show.
+
+    Returns "" when there is nothing to say, so a profile with no name and no
+    portfolio does not append a bare separator to every email.
+    """
+    lines = [line for line in [name.strip()] if line]
+
+    # Keys are whatever the user typed on their profile, so match on case-folded
+    # names rather than requiring them to have written "portfolio" exactly.
+    by_key = {str(k).strip().lower(): v for k, v in (links or {}).items()}
+    for key, label in SIGNATURE_LINK_KEYS:
+        url = str(by_key.get(key) or "").strip()
+        if url:
+            lines.append(f"{label}: {url}")
+            break
+
+    return "\n\n" + "\n".join(lines) if lines else ""
 
 
 @dataclass(frozen=True)
