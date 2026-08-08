@@ -354,7 +354,7 @@ export default function ProfileForm({ profile, disclosure, user }: Props) {
           reach, which is how the last line of the resume card became
           unreadable on a laptop.
         */}
-        <aside className="flex flex-col gap-4 xl:sticky xl:top-4 xl:max-h-[calc(100dvh-2rem)] xl:overflow-y-auto">
+        <aside className="flex flex-col gap-4 xl:sticky xl:top-4 xl:max-h-[calc(100dvh-2rem)] xl:overflow-y-auto xl:pr-1.5">
           <section className="dz-card items-center gap-3 text-center">
             <div className="relative">
               {avatarPreview ? (
