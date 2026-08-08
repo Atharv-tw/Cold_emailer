@@ -16,12 +16,15 @@ export default async function HelpPage() {
     <>
       <div className="page-header">
         <div>
-          <h1 style={{ fontSize: "28px", fontWeight: "700" }}>Help</h1>
-          <p style={{ marginTop: "0.25rem", color: "var(--muted)" }}>
-            How to actually find someone&rsquo;s email address before you write to them.
+          <h1>Help</h1>
+          <p>
+            How to actually find someone&rsquo;s email address before you write to them — and what
+            happens to a resume you upload.
           </p>
         </div>
       </div>
+
+      <h2 className="mt-2">Finding an address</h2>
 
       <Step title="1. Start with the company's email pattern">
         <p>
@@ -73,6 +76,50 @@ export default async function HelpPage() {
           what the &ldquo;What made you pick this person?&rdquo; field is for when you add someone —
           fill it in with something real and the draft will actually sound like you read their page,
           not like a template.
+        </p>
+      </Step>
+
+      {/*
+        The long-form version of the resume disclosure. The profile screen shows
+        one line and an info button; anything that needs a paragraph to explain
+        lives here, where it can be read by someone who wants it rather than
+        skimmed past by everyone who doesn't.
+      */}
+      <h2 className="mt-4 scroll-mt-6" id="resume">
+        Uploading a resume
+      </h2>
+
+      <Step title="What happens to the file">
+        <p>
+          The text of your resume is sent to Google Gemini to be read, using{" "}
+          <strong>your own API key</strong> — the one you set from the top bar. What it extracts —
+          headline, bio, links, education, projects and roles — is written into the profile form for
+          you to check. It is <strong>not</strong> saved to your profile until you press Save, so
+          anything the model got wrong is yours to fix first.
+        </p>
+        <p>
+          The file itself is deleted as soon as it has been read, unless you tick{" "}
+          <em>keep the original</em>. Everything stored is encrypted at rest.
+        </p>
+      </Step>
+
+      <Step title="Deleting it later">
+        <p>
+          <strong>Delete my resume and parsed data</strong> in Settings removes all of it, files
+          included. You don&rsquo;t have to keep a resume on file to keep using the app — every field
+          the upload fills in can be typed by hand, and the result is identical.
+        </p>
+      </Step>
+
+      <Step title="If nothing comes back">
+        <p>
+          Scanned or image-only PDFs can&rsquo;t be read — there is no text in them to extract, only a
+          picture of text. If yours came from a scanner or a photo, either export a text PDF from the
+          original document or fill the profile in by hand.
+        </p>
+        <p className="muted">
+          A <code>.docx</code> works just as well as a PDF, and is more reliable if your PDF was
+          produced by a design tool.
         </p>
       </Step>
     </>
