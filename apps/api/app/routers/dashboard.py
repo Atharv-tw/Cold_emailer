@@ -91,6 +91,10 @@ class ThreadMessage(BaseModel):
     status: str
     sent_at: datetime | None = None
     error: str = ""
+    # A queued message is still a draft - the state lives on the schedule row,
+    # not on the message - so without this the UI cannot tell "written" from
+    # "written and going out on Monday".
+    queued_for: datetime | None = None
 
 
 class TargetDetail(BaseModel):
@@ -98,6 +102,8 @@ class TargetDetail(BaseModel):
     messages: list[ThreadMessage]
     timeline: list[TimelineEntry]
     touches_remaining: int
+    queued_for: datetime | None = None
+    queued_step: int | None = None
 
 
 @router.get("/dashboard", response_model=DashboardOut)
@@ -298,6 +304,17 @@ async def timeline(target_id: uuid.UUID, user: CurrentUser, session: Db) -> Targ
     if target is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "no such target")
 
+    # step -> when it is due. Only pending rows: a cancelled or sent one is
+    # history, and showing it as queued would be a lie.
+    pending = {
+        row.step: row.due_at
+        for row in await session.scalars(
+            select(ScheduleRow).where(
+                ScheduleRow.target_id == target.id, ScheduleRow.state == "pending"
+            )
+        )
+    }
+
     messages = [
         ThreadMessage(
             step=message.step,
@@ -306,6 +323,7 @@ async def timeline(target_id: uuid.UUID, user: CurrentUser, session: Db) -> Targ
             status=message.status,
             sent_at=message.sent_at,
             error=message.error,
+            queued_for=pending.get(message.step) if message.status == "draft" else None,
         )
         for message in await session.scalars(
             select(Message).where(Message.target_id == target.id).order_by(Message.step)
@@ -332,4 +350,8 @@ async def timeline(target_id: uuid.UUID, user: CurrentUser, session: Db) -> Targ
         messages=messages,
         timeline=entries,
         touches_remaining=max(0, MAX_TOUCHES - target.touches_sent),
+        # Only ever one, since a step cannot be queued until the one before it
+        # has sent - but the earliest is the right answer regardless.
+        queued_for=min(pending.values()) if pending else None,
+        queued_step=min(pending, key=lambda step: pending[step]) if pending else None,
     )

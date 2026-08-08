@@ -281,6 +281,8 @@ export type ThreadMessage = {
   status: string;
   sent_at: string | null;
   error: string;
+  /** Set when this draft is queued. A queued message is still status "draft". */
+  queued_for: string | null;
 };
 
 export type TargetDetail = {
@@ -288,4 +290,6 @@ export type TargetDetail = {
   messages: ThreadMessage[];
   timeline: TimelineEntry[];
   touches_remaining: number;
+  queued_for: string | null;
+  queued_step: number | null;
 };

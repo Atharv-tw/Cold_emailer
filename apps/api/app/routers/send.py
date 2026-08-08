@@ -18,7 +18,7 @@ from sqlalchemy import select
 from outreach_core.scheduling import schedule_step
 
 from ..deps import CurrentUser, Db, SettingsDep
-from ..models import Message, Profile, ScheduleRow, Target
+from ..models import Event, Message, Profile, ScheduleRow, Target
 from ..services.gmail import GmailAuthRevoked, GmailError
 from ..services.sending import send_one, window_for
 
@@ -117,19 +117,45 @@ async def schedule_send(
 
     if target.status == "draft":
         target.status = "active"
+
+    # Without this the queue is invisible: the history panel reads events, the
+    # message stays a draft until it actually sends, and the due time lives on
+    # a row nothing returns - so queueing looked like it had done nothing.
+    session.add(
+        Event(
+            user_id=user.id,
+            target_id=target.id,
+            type="queued" if existing is None else "requeued",
+            detail=f"touch {step} due {due.isoformat(timespec='minutes')}",
+        )
+    )
+
     await session.commit()
     return SendResult(sent=False, scheduled_for=due, touches_sent=target.touches_sent)
 
 
 @router.delete("/schedule", status_code=status.HTTP_204_NO_CONTENT)
 async def cancel_schedule(target_id: uuid.UUID, user: CurrentUser, session: Db) -> None:
-    rows = await session.scalars(
-        select(ScheduleRow).where(
-            ScheduleRow.target_id == target_id,
-            ScheduleRow.user_id == user.id,
-            ScheduleRow.state == "pending",
+    rows = list(
+        await session.scalars(
+            select(ScheduleRow).where(
+                ScheduleRow.target_id == target_id,
+                ScheduleRow.user_id == user.id,
+                ScheduleRow.state == "pending",
+            )
         )
     )
     for row in rows:
         row.state = "cancelled"
+
+    if rows:
+        session.add(
+            Event(
+                user_id=user.id,
+                target_id=target_id,
+                type="queue_cancelled",
+                detail=", ".join(f"touch {row.step}" for row in rows),
+            )
+        )
+
     await session.commit()
