@@ -348,7 +348,13 @@ export default function ProfileForm({ profile, disclosure, user }: Props) {
     <>
       <div className="grid items-start gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
         {/* ---------------- left column: who you are, and the shortcut ------- */}
-        <aside className="flex flex-col gap-4 xl:sticky xl:top-4">
+        {/*
+          Capped at the viewport with its own scroll: a sticky column taller
+          than the screen pins its top and puts its bottom permanently out of
+          reach, which is how the last line of the resume card became
+          unreadable on a laptop.
+        */}
+        <aside className="flex flex-col gap-4 xl:sticky xl:top-4 xl:max-h-[calc(100dvh-2rem)] xl:overflow-y-auto">
           <section className="dz-card items-center gap-3 text-center">
             <div className="relative">
               {avatarPreview ? (
@@ -804,34 +810,40 @@ export default function ProfileForm({ profile, disclosure, user }: Props) {
               }}
             />
           </SectionCard>
-        </div>
-      </div>
 
-      {/* The only save button on the page, and it follows you down it. */}
-      <div className="sticky bottom-4 z-30 mt-1">
-        <div className="flex items-center gap-3 rounded-full bg-surface/95 p-2 pl-5 shadow-[var(--shadow-float)] ring-1 ring-line backdrop-blur">
-          <span className="min-w-0 flex-1 truncate text-[13px]">
-            {error ? (
-              <span className="error">{error}</span>
-            ) : status ? (
-              <span className="ok flex items-center gap-1.5">
-                <Icon name="check" size={14} strokeWidth={2.4} />
-                {status}
+          {/*
+            The only save button on the page, and it follows you down it. It
+            lives inside the right column rather than spanning the whole
+            width, because a full-width bar floats over the sticky left
+            column and covers it - and because these are the fields it saves.
+            The photo and the resume upload on the left save themselves.
+          */}
+          <div className="sticky bottom-4 z-30">
+            <div className="flex items-center gap-3 rounded-full bg-surface p-2 pl-5 shadow-[var(--shadow-float)] ring-1 ring-line">
+              <span className="min-w-0 flex-1 truncate text-[13px]">
+                {error ? (
+                  <span className="error">{error}</span>
+                ) : status ? (
+                  <span className="ok flex items-center gap-1.5">
+                    <Icon name="check" size={14} strokeWidth={2.4} />
+                    {status}
+                  </span>
+                ) : dirty ? (
+                  <span className="font-medium text-fg">Unsaved changes</span>
+                ) : (
+                  <span className="muted">Everything here is saved.</span>
+                )}
               </span>
-            ) : dirty ? (
-              <span className="font-medium text-fg">Unsaved changes</span>
-            ) : (
-              <span className="muted">Everything here is saved.</span>
-            )}
-          </span>
-          <button
-            type="button"
-            className={dirty ? "accent" : "secondary"}
-            onClick={onSave}
-            disabled={pending || !dirty}
-          >
-            {pending ? "Saving…" : "Save profile"}
-          </button>
+              <button
+                type="button"
+                className={dirty ? "accent" : "secondary"}
+                onClick={onSave}
+                disabled={pending || !dirty}
+              >
+                {pending ? "Saving…" : "Save profile"}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
