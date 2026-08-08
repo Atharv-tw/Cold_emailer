@@ -52,7 +52,12 @@ export default async function TargetPage({
 
       <div className="dashboard-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-          {verification.status && verification.status !== "deliverable" && (
+          {/* "Not configured" is a fact about the deployment, not about this
+              address. Warning on every target for a feature that was never
+              switched on trains people to ignore the banner that matters. */}
+          {verification.status &&
+            verification.status !== "deliverable" &&
+            verification.reason !== "verification_not_configured" && (
             <div className="dz-card" style={{ background: "var(--warning-light)", border: "1px solid #fde68a", padding: "1rem" }}>
               <p className={tone}>{verification.detail}</p>
               {verification.did_you_mean && (
