@@ -94,14 +94,21 @@ export default function TargetForm() {
           <input value={form.company} onChange={set("company")} />
         </label>
         <label>
-          Their role
-          <input value={form.role} onChange={set("role")} placeholder="Founder" />
+          Their job title
+          <input value={form.role} onChange={set("role")} placeholder="Head of ML Infrastructure" />
         </label>
+        <p className="muted">
+          Exactly as they would write it. This goes into the email as-is, so
+          the specific version beats the general one.
+        </p>
       </section>
 
       <section>
+        {/* Not the same question as the job title above, though it used to look
+            like it: the title is a fact that lands in the email, this picks the
+            playbook that decides how the email is shaped. */}
         <label>
-          Who are they?
+          Which approach fits them?
           <select value={form.target_type} onChange={set("target_type")}>
             {TARGET_TYPES.map(([value, label]) => (
               <option key={value} value={value}>
@@ -110,6 +117,10 @@ export default function TargetForm() {
             ))}
           </select>
         </label>
+        <p className="muted">
+          Sets how the email is structured — a recruiter gets something
+          skimmable, a professor gets a narrower question.
+        </p>
         <label>
           What kind of company?
           <select value={form.company_type} onChange={set("company_type")}>
@@ -153,9 +164,16 @@ export default function TargetForm() {
       <section>
         <fieldset>
           <legend>Their links (optional)</legend>
-          {(["linkedin", "portfolio", "other"] as const).map((key) => (
+          {(
+            [
+              ["linkedin", "LinkedIn"],
+              ["portfolio", "Portfolio"],
+              ["github", "GitHub"],
+              ["other", "Other"],
+            ] as const
+          ).map(([key, label]) => (
             <label key={key}>
-              {key}
+              {label}
               <input
                 value={links[key]}
                 onChange={(event) => setLinks({ ...links, [key]: event.target.value })}
