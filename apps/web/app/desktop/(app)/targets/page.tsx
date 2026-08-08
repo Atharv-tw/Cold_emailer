@@ -3,6 +3,7 @@ import Link from "next/link";
 import Avatar from "@/components/Avatar";
 import ImportButton from "@/components/ImportButton";
 import TargetFilters from "@/components/TargetFilters";
+import TargetTileMenu from "@/components/TargetTileMenu";
 import { api } from "@/lib/api";
 import { requireAuth } from "@/lib/auth-guard";
 import type { Target } from "@/lib/types";
@@ -97,9 +98,12 @@ export default async function TargetsPage({
                     <div className="text-xs text-muted">{target.role || "—"}</div>
                   </div>
                 </div>
-                <span className={`badge ${STATUS_TONE[target.status] ?? "badge-pending"}`}>
-                  {target.status.replace(/_/g, " ")}
-                </span>
+                <div className="flex items-center gap-1">
+                  <span className={`badge ${STATUS_TONE[target.status] ?? "badge-pending"}`}>
+                    {target.status.replace(/_/g, " ")}
+                  </span>
+                  <TargetTileMenu target={target} />
+                </div>
               </div>
 
               <div className="text-sm text-fg">{target.company || "—"}</div>
