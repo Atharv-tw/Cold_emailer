@@ -21,7 +21,9 @@ export default async function Home() {
           await signIn("google", { redirectTo: "/dashboard" });
         }}
       >
-        <button type="submit">Continue with Google</button>
+        <button type="submit" className="primary">
+          Continue with Google
+        </button>
       </form>
 
       <div className="note">

@@ -184,7 +184,12 @@ export default function TargetForm() {
       </section>
 
       <section>
-        <button type="button" onClick={submit} disabled={pending || !form.email}>
+        <button
+          type="button"
+          className="accent"
+          onClick={submit}
+          disabled={pending || !form.email}
+        >
           {pending ? "Checking the address…" : "Add them"}
         </button>
         <p className="muted">

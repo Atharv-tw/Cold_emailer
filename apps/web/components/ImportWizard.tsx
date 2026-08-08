@@ -184,6 +184,7 @@ export default function ImportWizard() {
           <section>
             <button
               type="button"
+              className="accent"
               onClick={commit}
               disabled={pending || !summary || summary.importable === 0}
             >
