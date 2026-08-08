@@ -67,7 +67,7 @@ export default function DesktopChrome({
         <Link href="/dashboard" className="flex items-center gap-3 px-2 py-1">
           <span className="rail-icon">
             <span
-              className="flex h-7 w-7 items-center justify-center rounded-full text-[13px] font-bold"
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-bold"
               style={{ background: "var(--lime)", color: "var(--ink)", fontFamily: "var(--font-display)" }}
             >
               O
