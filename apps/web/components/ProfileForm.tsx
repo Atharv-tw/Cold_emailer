@@ -466,11 +466,6 @@ export default function ProfileForm({ profile, disclosure, user }: Props) {
               </button>
             </div>
 
-            <p className="text-[12.5px] text-white/70">
-              Your resume is sent to Google Gemini to fill in the fields below. Nothing is saved until
-              you check it and hit save.
-            </p>
-
             <label className="m-0 flex cursor-pointer flex-row items-center justify-center gap-2 rounded-full bg-lime px-4 py-2.5 text-[13px] font-semibold text-ink transition-colors hover:bg-lime-dark">
               <Icon name="upload" size={16} />
               {resumeFile ? "Choose a different file" : "Autofill profile with resume"}
