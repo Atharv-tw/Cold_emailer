@@ -17,9 +17,14 @@ from outreach_core.scheduling import DAY_NAMES, ScheduleError, SendingWindow
 
 
 class LinksIn(BaseModel):
+    # Every key the profile form offers has to be declared here. The router
+    # rebuilds `profile.links` from this model's dump, and pydantic drops
+    # undeclared fields without complaining - so a field missing from this
+    # list is not rejected on save, it is silently discarded on every save.
     portfolio: str = ""
     linkedin: str = ""
     github: str = ""
+    resume: str = ""
     other: str = ""
 
 
