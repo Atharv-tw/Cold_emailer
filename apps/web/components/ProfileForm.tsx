@@ -50,6 +50,51 @@ const FIELD_LABELS: Record<string, string> = {
   availability: "Availability",
 };
 
+const DAYS: [string, string][] = [
+  ["mon", "Mon"],
+  ["tue", "Tue"],
+  ["wed", "Wed"],
+  ["thu", "Thu"],
+  ["fri", "Fri"],
+  ["sat", "Sat"],
+  ["sun", "Sun"],
+];
+
+/**
+ * A hand-picked list rather than `Intl.supportedValuesOf("timeZone")`.
+ *
+ * That call would give every IANA name, but it runs during SSR too, and the
+ * server's ICU build and the browser's do not have to agree - which shows up
+ * as a hydration mismatch on a control nobody was looking at. A fixed list is
+ * identical on both sides, and the profile's own value is added to it below so
+ * a zone set elsewhere is never silently dropped on the next save.
+ */
+const TIMEZONES = [
+  "UTC",
+  "Asia/Kolkata",
+  "Asia/Dubai",
+  "Asia/Singapore",
+  "Asia/Tokyo",
+  "Asia/Shanghai",
+  "Asia/Jakarta",
+  "Australia/Sydney",
+  "Europe/London",
+  "Europe/Dublin",
+  "Europe/Paris",
+  "Europe/Berlin",
+  "Europe/Amsterdam",
+  "Europe/Lisbon",
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Los_Angeles",
+  "America/Toronto",
+  "America/Sao_Paulo",
+  "Africa/Lagos",
+  "Africa/Nairobi",
+  "Africa/Johannesburg",
+];
+
 const LINK_FIELDS = [
   ["portfolio", "Portfolio"],
   ["resume", "Resume link"],
@@ -235,6 +280,34 @@ export default function ProfileForm({ profile, disclosure, user }: Props) {
   const [projects, setProjects] = useState<Project[]>(profile.projects);
   const [experience, setExperience] = useState<Experience[]>(profile.experience);
 
+  // The window the worker sends inside. An empty sending_window means the
+  // profile has never had one set, and the API's defaults are UTC 09:00-17:00
+  // - which is why an unset window puts an Indian user's mail out at 10pm.
+  const savedWindow = (profile.sending_window ?? {}) as {
+    timezone?: string;
+    start?: string;
+    end?: string;
+    days?: string[];
+  };
+  const [timezone, setTimezone] = useState(savedWindow.timezone || "UTC");
+  const [windowStart, setWindowStart] = useState(savedWindow.start || "09:00");
+  const [windowEnd, setWindowEnd] = useState(savedWindow.end || "17:00");
+  const [sendDays, setSendDays] = useState<string[]>(
+    savedWindow.days?.length ? savedWindow.days : ["mon", "tue", "wed", "thu", "fri"],
+  );
+  // Read after mount only: the server renders in its own zone, so doing this
+  // during render is a hydration mismatch.
+  const [detectedZone, setDetectedZone] = useState("");
+  useEffect(() => {
+    try {
+      setDetectedZone(Intl.DateTimeFormat().resolvedOptions().timeZone || "");
+    } catch {
+      setDetectedZone("");
+    }
+  }, []);
+
+  const zoneOptions = TIMEZONES.includes(timezone) ? TIMEZONES : [timezone, ...TIMEZONES];
+
   // Which fields came from a resume rather than from the user. Cleared as
   // soon as they touch one, because at that point it is theirs.
   const [extracted, setExtracted] = useState<Set<string>>(new Set());
@@ -375,7 +448,12 @@ export default function ProfileForm({ profile, disclosure, user }: Props) {
           education: education.map((line) => line.trim()).filter(Boolean).join("\n"),
           availability,
           links,
-          sending_window: profile.sending_window ?? {},
+          sending_window: {
+            timezone,
+            start: windowStart,
+            end: windowEnd,
+            days: sendDays,
+          },
         });
         await saveProjects(projects);
         await saveExperience(experience);
@@ -690,6 +768,100 @@ export default function ProfileForm({ profile, disclosure, user }: Props) {
                 </Field>
               ))}
             </div>
+          </SectionCard>
+
+          <SectionCard
+            icon="clock"
+            title="Sending window"
+            hint="The hours a send is allowed to go out in. Times inside the window are randomised, so sends never look like a cron job."
+          >
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Timezone">
+                <select
+                  value={timezone}
+                  onChange={(event) => {
+                    setTimezone(event.target.value);
+                    touch();
+                  }}
+                >
+                  {zoneOptions.map((zone) => (
+                    <option key={zone} value={zone}>
+                      {zone}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              <Field label="Days">
+                <div className="flex flex-wrap gap-1.5">
+                  {DAYS.map(([value, label]) => {
+                    const on = sendDays.includes(value);
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        className={on ? "accent small" : "secondary small"}
+                        aria-pressed={on}
+                        onClick={() => {
+                          const next = on
+                            ? sendDays.filter((day) => day !== value)
+                            : [...sendDays, value];
+                          // Keep calendar order however they were clicked.
+                          setSendDays(DAYS.map(([day]) => day).filter((day) => next.includes(day)));
+                          touch();
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </Field>
+
+              <Field label="Earliest">
+                <input
+                  type="time"
+                  value={windowStart}
+                  onChange={(event) => {
+                    setWindowStart(event.target.value);
+                    touch();
+                  }}
+                />
+              </Field>
+
+              <Field label="Latest">
+                <input
+                  type="time"
+                  value={windowEnd}
+                  onChange={(event) => {
+                    setWindowEnd(event.target.value);
+                    touch();
+                  }}
+                />
+              </Field>
+            </div>
+
+            {detectedZone && detectedZone !== timezone && (
+              <button
+                type="button"
+                className="quiet small self-start"
+                onClick={() => {
+                  setTimezone(detectedZone);
+                  touch();
+                }}
+              >
+                Use my timezone ({detectedZone})
+              </button>
+            )}
+
+            {/* Both of these are refused by the API too. Saying so here means
+                finding out before the save rather than from a 422. */}
+            {sendDays.length === 0 && (
+              <p className="error">Pick at least one day, or nothing will ever send.</p>
+            )}
+            {windowStart >= windowEnd && (
+              <p className="error">The earliest time has to be before the latest one.</p>
+            )}
           </SectionCard>
 
           <SectionCard
