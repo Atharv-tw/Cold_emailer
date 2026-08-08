@@ -3,6 +3,8 @@
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
+import Icon from "@/components/Icon";
+
 type ModalProps = {
   open: boolean;
   onClose: () => void;
@@ -61,8 +63,8 @@ export default function Modal({ open, onClose, title, children, widthClassName =
         {title && (
           <div className="flex shrink-0 items-center justify-between border-b border-line px-6 py-4">
             <h2 className="text-lg font-semibold text-fg">{title}</h2>
-            <button type="button" className="quiet" onClick={onClose} aria-label="Close">
-              ✕
+            <button type="button" className="quiet p-2" onClick={onClose} aria-label="Close">
+              <Icon name="x" size={16} />
             </button>
           </div>
         )}

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import Icon from "@/components/Icon";
 import Modal from "@/components/Modal";
 import { useGeminiKey } from "@/lib/useGeminiKey";
 
@@ -18,16 +19,12 @@ export default function GeminiKeyPill() {
           setDraft(key);
           setOpen(true);
         }}
-        className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5 ${
-          hasKey ? "border-accent bg-accent-light text-accent" : "border-warning bg-warning-light text-warning"
+        className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold transition-colors ${
+          hasKey ? "bg-lime-tint text-accent" : "bg-warning-light text-warning"
         }`}
       >
-        {hasKey ? "Gemini key set" : (
-          <>
-            <span style={{ fontSize: "14px", lineHeight: 1 }}>⚠️</span>
-            Gemini key: not set
-          </>
-        )}
+        <Icon name={hasKey ? "check" : "info"} size={14} strokeWidth={2.2} />
+        {hasKey ? "Gemini key set" : "Gemini key: not set"}
       </button>
 
       <Modal open={open} onClose={() => setOpen(false)} title="Your Gemini API key" widthClassName="max-w-sm">
