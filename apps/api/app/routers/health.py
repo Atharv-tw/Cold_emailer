@@ -22,6 +22,11 @@ async def healthz() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@router.get("/ping")
+async def ping() -> dict[str, str]:
+    return {"ping": "pong"}
+
+
 @router.get("/readyz")
 async def readyz(settings: SettingsDep) -> dict[str, object]:
     checks: dict[str, object] = {}
