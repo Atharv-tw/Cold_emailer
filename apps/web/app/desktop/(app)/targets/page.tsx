@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import Avatar from "@/components/Avatar";
+import Icon from "@/components/Icon";
 import ImportButton from "@/components/ImportButton";
 import TargetFilters from "@/components/TargetFilters";
 import TargetTileMenu from "@/components/TargetTileMenu";
@@ -83,7 +84,9 @@ export default async function TargetsPage({
 
       {targets.length === 0 ? (
         <div className="dz-card items-center py-16 text-center text-muted">
-          <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>📭</div>
+          <div style={{ marginBottom: "1rem" }}>
+            <Icon name="users" size={48} />
+          </div>
           <h3>Nobody found</h3>
           <p>Try adjusting your filters or adding a new contact.</p>
         </div>
