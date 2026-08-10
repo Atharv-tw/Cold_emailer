@@ -29,7 +29,9 @@ from app.services.gmail import (  # noqa: E402
     GmailAuthRevoked, GmailClient, GmailError, GmailNotFound, GmailRateLimited,
     exchange_refresh_token,
 )
-from app.services.replies import headers_of, plain_text, process_thread  # noqa: E402
+from app.services.replies import (  # noqa: E402
+    delivery_status, headers_of, plain_text, process_thread,
+)
 
 SENDER = SenderIdentity(email="me@send.test", from_name="Dana Sharma")
 
@@ -437,6 +439,57 @@ class TestPayloadParsing(unittest.TestCase):
     def test_headers_are_flattened(self):
         headers = headers_of({"headers": [{"name": "Subject", "value": "Hi"}]})
         self.assertEqual(headers["Subject"], "Hi")
+
+
+class TestDeliveryStatusExtraction(unittest.TestCase):
+    """The bridge between a Gmail payload and hard/soft bounce classification.
+
+    `plain_text` skips `message/delivery-status` by design, so without this
+    extractor the `Status:` line never reaches `classify` and every bounce
+    looks permanent.
+    """
+
+    def dsn_payload(self) -> dict:
+        return {
+            "mimeType": "multipart/report",
+            "parts": [
+                {"mimeType": "text/plain", "body": {"data": b64("Delivery failed.")}},
+                {
+                    "mimeType": "message/delivery-status",
+                    "body": {"data": b64("Final-Recipient: rfc822; a@b.com\nStatus: 5.1.1\n")},
+                },
+            ],
+        }
+
+    def test_the_delivery_status_part_is_extracted(self):
+        self.assertIn("Status: 5.1.1", delivery_status(self.dsn_payload()))
+
+    def test_the_prose_body_is_left_to_plain_text(self):
+        """The two extractors read disjoint parts, so a quoted 'Status:' line
+        in the prose cannot be mistaken for the machine report."""
+        self.assertNotIn("Delivery failed", delivery_status(self.dsn_payload()))
+        self.assertNotIn("Status: 5.1.1", plain_text(self.dsn_payload()))
+
+    def test_an_ordinary_reply_has_no_delivery_status(self):
+        payload = {"mimeType": "text/plain", "body": {"data": b64("Sure, Tuesday works.")}}
+        self.assertEqual(delivery_status(payload), "")
+
+    def test_nested_report_parts_are_walked(self):
+        payload = {
+            "mimeType": "multipart/mixed",
+            "parts": [
+                {
+                    "mimeType": "multipart/report",
+                    "parts": [
+                        {
+                            "mimeType": "message/delivery-status",
+                            "body": {"data": b64("Status: 4.2.2\n")},
+                        }
+                    ],
+                }
+            ],
+        }
+        self.assertIn("Status: 4.2.2", delivery_status(payload))
 
 
 if __name__ == "__main__":

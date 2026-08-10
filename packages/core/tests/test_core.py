@@ -20,8 +20,8 @@ from zoneinfo import ZoneInfo
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from outreach_core.classify import (  # noqa: E402
-    AUTOREPLY_DEFER, Classification, Inbound, Verdict, classify,
-    is_autoreply, is_bounce,
+    AUTOREPLY_DEFER, SOFT_BOUNCE_DEFER, Classification, Inbound, Verdict, classify,
+    dsn_status, is_autoreply, is_bounce, is_permanent_bounce, is_transient_bounce,
 )
 from outreach_core.limits import (  # noqa: E402
     MAX_TOUCHES, MIN_BUSINESS_DAYS_BETWEEN_TOUCHES, RecipientGuard,
@@ -569,6 +569,95 @@ class TestClassify(unittest.TestCase):
 
     def test_classification_is_a_value(self):
         self.assertIsInstance(classify(inbound(body="yes")), Classification)
+
+
+# ------------------------------------------------------- hard vs soft bounces
+
+
+def dsn(status: str, subject="Delivery Status Notification (Failure)") -> Inbound:
+    """A bounce carrying a machine-readable delivery status."""
+    return Inbound(
+        headers={"Subject": subject, "From": "mailer-daemon@googlemail.com"},
+        body="Your message was not delivered.",
+        delivery_status=(
+            "Reporting-MTA: dns; googlemail.com\n"
+            "Final-Recipient: rfc822; nobody@example.com\n"
+            f"Status: {status}\n"
+            "Diagnostic-Code: smtp; 550 5.1.1 No such user\n"
+        ),
+    )
+
+
+class TestBouncePermanence(unittest.TestCase):
+    """A dead mailbox and a full one arrive looking identical to the subject
+    heuristics. Only the RFC 3463 status tells them apart, and only a permanent
+    one may be recorded against the address for every user of the platform."""
+
+    def test_a_hard_bounce_is_permanent_and_stops_the_sequence(self):
+        result = classify(dsn("5.1.1"))
+        self.assertEqual(result.verdict, Verdict.BOUNCE)
+        self.assertTrue(result.permanent)
+        self.assertTrue(result.stops_sequence)
+        self.assertTrue(result.suppresses)
+        self.assertIsNone(result.defer)
+
+    def test_a_soft_bounce_defers_instead_of_stopping(self):
+        result = classify(dsn("4.2.2"))
+        self.assertEqual(result.verdict, Verdict.BOUNCE)
+        self.assertFalse(result.permanent)
+        self.assertFalse(result.stops_sequence)
+        # A full mailbox must not land on the user's do-not-contact list.
+        self.assertFalse(result.suppresses)
+        self.assertEqual(result.defer, SOFT_BOUNCE_DEFER)
+
+    def test_a_bounce_without_a_parseable_status_is_never_global(self):
+        """The subject and sender heuristics still catch it, so the sequence
+        stops - but a guess must not kill the address for everybody."""
+        result = classify(
+            inbound(
+                from_addr="mailer-daemon@googlemail.com",
+                subject="Undeliverable: your message",
+                body="delivery failed",
+            )
+        )
+        self.assertEqual(result.verdict, Verdict.BOUNCE)
+        self.assertFalse(result.permanent)
+        self.assertTrue(result.stops_sequence)
+        self.assertTrue(result.suppresses)
+
+    def test_status_is_read_only_from_the_delivery_status_part(self):
+        """A bounce quotes the original message. A line reading 'Status: 5.0.0'
+        in that quoted copy must not be mistaken for the report's own."""
+        message = Inbound(
+            headers={"Subject": "Undeliverable", "From": "mailer-daemon@example.com"},
+            body="Original message follows:\nStatus: 5.0.0\n",
+            delivery_status="",
+        )
+        self.assertIsNone(dsn_status(message))
+        self.assertFalse(classify(message).permanent)
+
+    def test_status_parsing(self):
+        self.assertEqual(dsn_status(dsn("5.7.1")), "5.7.1")
+        self.assertEqual(dsn_status(dsn("4.4.7")), "4.4.7")
+        self.assertTrue(is_permanent_bounce("5.1.1"))
+        self.assertFalse(is_permanent_bounce("4.1.1"))
+        self.assertFalse(is_permanent_bounce(None))
+        self.assertTrue(is_transient_bounce("4.2.2"))
+        self.assertFalse(is_transient_bounce("5.2.2"))
+
+    def test_status_is_matched_case_insensitively_and_with_leading_space(self):
+        message = Inbound(
+            headers={"Subject": "Undeliverable", "From": "postmaster@example.com"},
+            delivery_status="  status: 5.1.1\n",
+        )
+        self.assertEqual(dsn_status(message), "5.1.1")
+
+    def test_an_autoreply_still_defers_and_does_not_suppress(self):
+        """Guards the refactor of `stops_sequence` onto the defer field."""
+        result = classify(inbound(subject="Out of office", body="back monday"))
+        self.assertEqual(result.verdict, Verdict.AUTOREPLY)
+        self.assertFalse(result.stops_sequence)
+        self.assertFalse(result.suppresses)
 
 
 if __name__ == "__main__":

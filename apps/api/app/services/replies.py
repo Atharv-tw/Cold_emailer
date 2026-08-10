@@ -27,10 +27,11 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from outreach_core.classify import Inbound, Verdict, classify
 
-from ..models import Event, Target, User
+from ..models import DeadAddress, Event, Target, User
 from .gmail import GmailClient, GmailError, GmailNotFound
 from .sending import stop_sequence, suppress
 
@@ -85,6 +86,29 @@ def plain_text(payload: dict) -> str:
     return re.sub(r"<[^>]+>", " ", "\n".join(html))
 
 
+def delivery_status(payload: dict) -> str:
+    """The `message/delivery-status` parts of a bounce, concatenated.
+
+    `plain_text` above deliberately collects only text/plain and text/html, so
+    the machine-readable half of a DSN - the part carrying `Status: 5.1.1` -
+    never reaches it. Without this, classification has nothing but the subject
+    line to go on and cannot tell a dead mailbox from a full one.
+    """
+    parts = [payload]
+    found: list[str] = []
+
+    while parts:
+        part = parts.pop()
+        for child in part.get("parts") or []:
+            parts.append(child)
+        if part.get("mimeType") == "message/delivery-status":
+            data = (part.get("body") or {}).get("data")
+            if data:
+                found.append(_decode(data))
+
+    return "\n".join(found)
+
+
 def headers_of(payload: dict) -> dict[str, str]:
     return {h.get("name", ""): h.get("value", "") for h in (payload.get("headers") or [])}
 
@@ -127,14 +151,19 @@ async def process_thread(
     # out-of-office followed by a real reply must end up as a reply.
     full = await gmail.get_message(inbound_ids[-1])
     payload = full.get("payload") or {}
-    inbound = Inbound(headers=headers_of(payload), body=plain_text(payload))
+    inbound = Inbound(
+        headers=headers_of(payload),
+        body=plain_text(payload),
+        delivery_status=delivery_status(payload),
+    )
     result = classify(inbound)
 
-    if result.verdict is Verdict.AUTOREPLY:
-        # Explicitly not a stop. Someone on leave is not someone uninterested,
-        # and killing the sequence here is the easiest way to lose a lead for
+    if result.defer is not None:
+        # Explicitly not a stop, for either case that lands here. Someone on
+        # leave is not someone uninterested, and a full mailbox is not a dead
+        # one - treating either as final is the easiest way to lose a lead for
         # no reason.
-        deferred = now + (result.defer or timedelta(days=7))
+        deferred = now + result.defer
         await _defer(session, user, target, deferred, result.reason)
         return ReplyOutcome(
             str(target.id), result.verdict.value, result.reason, stopped=False,
@@ -147,6 +176,8 @@ async def process_thread(
     if result.verdict is Verdict.BOUNCE:
         await stop_sequence(session, user_id=user.id, target=target, status="bounced", detail=result.reason)
         await suppress(session, user_id=user.id, email=target.email, reason="bounced")
+        if result.permanent:
+            await record_dead_address(session, target.email, result.reason)
     elif result.verdict is Verdict.OPT_OUT:
         await stop_sequence(session, user_id=user.id, target=target, status="opted_out", detail=result.reason)
         await suppress(session, user_id=user.id, email=target.email, reason="asked not to be contacted")
@@ -154,6 +185,39 @@ async def process_thread(
         await stop_sequence(session, user_id=user.id, target=target, status="replied", detail=result.reason)
 
     return ReplyOutcome(str(target.id), result.verdict.value, result.reason, stopped=True)
+
+
+async def record_dead_address(session, email: str, reason: str) -> None:
+    """Mark one mailbox dead for every user of this platform, permanently.
+
+    Called only for a parsed 5.x.x delivery status. A bounce recognised by
+    subject or sender alone stops the one sequence and goes no further: acting
+    on a guess here would burn a good contact for everybody at once.
+
+    Deliberately writes `dead_addresses` and nothing else. Marking the matching
+    `contacts` row undeliverable would be a pleasant cache, but the application
+    role cannot update a pool row - the UPDATE policy is scoped to rows the
+    session owns, so it would match zero rows and succeed, which is the worst
+    of both. The pool listing anti-joins this table instead, which needs no
+    privilege the request does not have.
+    """
+    normalised = email.strip().lower()
+    await session.execute(
+        pg_insert(DeadAddress)
+        .values(email=normalised, reason=reason[:500])
+        # First bounce wins: the earliest reason is the most useful one, and
+        # re-recording would only overwrite it with a later duplicate.
+        .on_conflict_do_nothing(index_elements=["email"])
+    )
+
+
+async def is_dead_address(session, email: str) -> bool:
+    """Whether this mailbox has already hard-bounced for anyone."""
+    return (
+        await session.scalar(
+            select(DeadAddress.email).where(DeadAddress.email == email.strip().lower())
+        )
+    ) is not None
 
 
 async def _defer(session, user: User, target: Target, until: datetime, reason: str) -> None:
