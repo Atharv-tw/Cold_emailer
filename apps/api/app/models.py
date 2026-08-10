@@ -182,16 +182,124 @@ class Resume(Base, TimestampMixin):
 # --------------------------------------------------------------------- targets
 
 
+class Contact(Base, TimestampMixin):
+    """A person who can be written to, and who - if anyone - owns that record.
+
+    `owner_user_id` is the entire public/private mechanism, and it is one
+    nullable column rather than a flag:
+
+        NULL       in the shared pool. Every user reads it, no user writes it.
+        a user id  private to that user.
+
+    An enum alongside the owner would let the two disagree; a single column
+    cannot. The asymmetric RLS policy in migration 0008 is what enforces the
+    read/write split - `USING` admits public rows, `WITH CHECK` does not, so a
+    request can see the pool but never write into it. Pool rows are written by
+    the loader connecting as the schema owner, never by the application role.
+
+    This is the catalogue. What a user has actually *done* about a contact
+    lives on `Target`, because `status`, `gmail_thread_id` and `touches_sent`
+    differ per user and cannot live on a row many users share.
+    """
+
+    __tablename__ = "contacts"
+    __table_args__ = (
+        # Private rows: one user cannot hold the same address twice. Public
+        # rows have a NULL owner, which Postgres treats as distinct in a unique
+        # constraint, so this does *not* dedupe the pool - the partial index in
+        # 0008 does that.
+        UniqueConstraint("owner_user_id", "email", name="uq_contacts_owner_email"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    owner_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+
+    name: Mapped[str] = mapped_column(String(255), default="")
+    email: Mapped[str] = mapped_column(String(320), nullable=False)
+    role: Mapped[str] = mapped_column(String(255), default="")
+    links: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+
+    # The company is denormalised onto the person on purpose. 253 companies to
+    # 507 people is a small repeat, the pool is curated and changes rarely, and
+    # a flat row maps straight onto the CSV import path that already exists.
+    company: Mapped[str] = mapped_column(String(255), default="")
+    company_description: Mapped[str] = mapped_column(Text, default="")
+    company_website: Mapped[str] = mapped_column(Text, default="")
+
+    target_type: Mapped[str] = mapped_column(String(64), default="")
+    company_type: Mapped[str] = mapped_column(String(64), default="")
+    timezone: Mapped[str] = mapped_column(String(64), default="")
+
+    # Verified once, for everyone. A pool contact found undeliverable is dead
+    # for every user at the same moment - see `DeadAddress`.
+    verification: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+
+    # Identifier from whatever seeded this row, so re-running a loader updates
+    # rather than duplicating. Empty for contacts a user typed in themselves.
+    source_id: Mapped[str] = mapped_column(String(128), default="")
+    retired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class DeadAddress(Base):
+    """Addresses that hard-bounced. Global, permanent, owned by nobody.
+
+    Deliberately plaintext, which is a departure from `RecipientGuardRow`. That
+    table is HMAC'd because it would otherwise be a record of *who this
+    platform's users are contacting*. This one says only that a mailbox does
+    not exist, and for pool contacts the address already sits in plaintext in
+    `contacts` - hashing would buy nothing and would cost the ability to join.
+
+    Only permanent failures (SMTP 5.x.x) belong here. A transient 4.x.x means a
+    full mailbox or a greylisting server, and recording it would let one bad
+    afternoon at a mail host burn a good contact for every user, forever.
+    """
+
+    __tablename__ = "dead_addresses"
+
+    email: Mapped[str] = mapped_column(String(320), primary_key=True)
+    reason: Mapped[str] = mapped_column(Text, default="")
+    first_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class Target(Base, TimestampMixin):
+    """One user's outreach to one contact: the relationship, plus a snapshot.
+
+    The person's details are copied here from `Contact` when the target is
+    created, rather than read through the foreign key. That duplication is
+    deliberate twice over:
+
+    * `uq_targets_user_email` needs the address on this table. Keying only on
+      `(user_id, contact_id)` would let a user hold the pool's contact for an
+      address *and* a private contact for the same address, and write to the
+      same person twice from the same account.
+    * A target records what was actually sent. If the pool later corrects a
+      company description, a thread already in flight should not retroactively
+      claim the user wrote something they did not.
+    """
+
     __tablename__ = "targets"
     __table_args__ = (
         # One user cannot hold the same address twice; two different users can.
         UniqueConstraint("user_id", "email", name="uq_targets_user_email"),
+        # Nor reach the same catalogue entry twice. Both constraints are needed:
+        # this one stops a contact being added twice, the one above stops the
+        # same address arriving via two different contacts.
+        UniqueConstraint("user_id", "contact_id", name="uq_targets_user_contact"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    # The catalogue entry this was taken from. Nullable because targets created
+    # before the pool existed have no entry, and `ondelete="SET NULL"` because
+    # retiring a contact must not delete somebody's sent thread along with it.
+    contact_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("contacts.id", ondelete="SET NULL"), index=True
     )
 
     name: Mapped[str] = mapped_column(String(255), default="")
@@ -228,6 +336,16 @@ class Target(Base, TimestampMixin):
     touches_sent: Mapped[int] = mapped_column(Integer, default=0)
     last_touch_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     thread_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    # A finished sequence may later start again. `touches_sent` resets to 0 and
+    # the run is counted here instead, which is what keeps it inside the
+    # `touches_sent <= MAX_TOUCHES` check constraint rather than climbing past
+    # it.
+    #
+    # `cycles_used` counts sequences *completed*, not started - counting starts
+    # would permit MAX_CYCLES + 1 runs, because the first was never counted.
+    cycles_used: Mapped[int] = mapped_column(Integer, default=0)
+    last_cycle_ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     messages: Mapped[list["Message"]] = relationship(
         back_populates="target", cascade="all, delete-orphan"
@@ -366,6 +484,14 @@ class PushSubscription(Base, TimestampMixin):
 
 # Tables carrying a user_id, used by the migration to switch RLS on uniformly
 # rather than by a hand-maintained list that drifts from the models.
+#
+# `contacts` is deliberately absent. The uniform policy here is
+# `user_id = current_setting(...)`, and a pool contact's owner is NULL, so
+# under that predicate the entire shared pool would be invisible to everyone -
+# silently, with no error. It gets its own asymmetric policy in 0008 instead.
+#
+# `dead_addresses`, `recipient_guard` and `worker_heartbeat` are absent because
+# they belong to no user at all.
 USER_SCOPED_TABLES = [
     "google_tokens", "gmail_watch", "profiles", "profile_projects",
     "profile_experience", "resumes", "targets", "messages", "schedule",

@@ -39,6 +39,7 @@ export default async function TargetsPage({
       <h1>People</h1>
       <p>
         <Link href="/dashboard">← Dashboard</Link> ·{" "}
+        <Link href="/pool">Browse pool</Link> ·{" "}
         <Link href="/targets/new">Add someone</Link> ·{" "}
         <Link href="/import">Import a list</Link>
       </p>

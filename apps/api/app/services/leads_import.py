@@ -148,6 +148,7 @@ class ReviewResult:
             "needs_hook": 0,
             "duplicates": 0,
             "suppressed": 0,
+            "undeliverable": 0,
             "invalid": 0,
         }
         for row in self.rows:
@@ -159,6 +160,8 @@ class ReviewResult:
                 counts["duplicates"] += 1
             elif row.status == "suppressed":
                 counts["suppressed"] += 1
+            elif row.status == "undeliverable":
+                counts["undeliverable"] += 1
             elif row.status == "invalid":
                 counts["invalid"] += 1
         return counts
@@ -179,12 +182,19 @@ def review(
     *,
     existing_emails: set[str],
     suppressed_emails: set[str],
+    dead_emails: set[str] = frozenset(),
 ) -> ReviewResult:
     """Classify every row against the same gates single-add applies.
 
-    `existing_emails` and `suppressed_emails` are expected already normalised
-    (lower-cased, trimmed); addresses seen earlier in this same file count as
-    duplicates too, so a list that repeats someone is not imported twice.
+    `existing_emails`, `suppressed_emails` and `dead_emails` are expected
+    already normalised (lower-cased, trimmed); addresses seen earlier in this
+    same file count as duplicates too, so a list that repeats someone is not
+    imported twice.
+
+    `dead_emails` are mailboxes that have hard-bounced for *any* user of the
+    platform, which is different from the caller's own suppression list and is
+    worth telling them apart: one is a choice they made, the other is a fact
+    about the address.
     """
     unmapped_required = [
         f.key for f in FIELDS if f.required and f.key not in mapping.values()
@@ -213,6 +223,9 @@ def review(
         elif email in suppressed_emails:
             issues.insert(0, "on your do-not-contact list")
             status = "suppressed"
+        elif email in dead_emails:
+            issues.insert(0, "this mailbox does not exist - mail to it hard-bounced")
+            status = "undeliverable"
         elif email in existing_emails or email in seen:
             issues.insert(0, "already on your list")
             status = "duplicate"

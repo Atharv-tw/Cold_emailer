@@ -36,9 +36,21 @@ UNSUB_PHRASES = (
 
 EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 
+# The machine-readable verdict in a delivery status notification, RFC 3463:
+# `Status: 5.1.1`. The first digit is the whole story - 5 permanent, 4
+# transient - and it is the only part of a bounce worth trusting, since the
+# subject and sender heuristics below cannot tell the two apart at all.
+DSN_STATUS_RE = re.compile(r"^\s*Status:\s*([245])\.(\d+)\.(\d+)", re.MULTILINE | re.IGNORECASE)
+
 # An auto-responder pauses a sequence rather than ending it. A week is long
 # enough to outlast most leave without letting a target go cold.
 AUTOREPLY_DEFER = timedelta(days=7)
+
+# A transient bounce - a full mailbox, a greylisting server, a host that was
+# down - is a pause, not a verdict on the address. Separate from the
+# auto-reply constant because the two are different phenomena and will want
+# different numbers eventually.
+SOFT_BOUNCE_DEFER = timedelta(days=7)
 
 # Only the top of a long reply is searched for an opt-out phrase, so a quoted
 # copy of an older thread cannot trigger a permanent suppression.
@@ -58,6 +70,11 @@ class Inbound:
 
     headers: Mapping[str, str] = field(default_factory=dict)
     body: str = ""
+    # The `message/delivery-status` part of a bounce, verbatim. Separate from
+    # `body` because the two are read differently: the body is prose and gets
+    # searched for phrases, this is a machine report and gets parsed. Empty for
+    # every message that is not a DSN, which is nearly all of them.
+    delivery_status: str = ""
 
     def header(self, name: str) -> str:
         lowered = name.lower()
@@ -77,11 +94,17 @@ class Inbound:
         return match.group(0).lower() if match else raw.strip().lower()
 
     @classmethod
-    def from_gmail(cls, headers: Iterable[Mapping[str, str]], body: str = "") -> "Inbound":
+    def from_gmail(
+        cls,
+        headers: Iterable[Mapping[str, str]],
+        body: str = "",
+        delivery_status: str = "",
+    ) -> "Inbound":
         """Build from a Gmail API ``payload.headers`` list."""
         return cls(
             headers={h.get("name", ""): h.get("value", "") for h in headers},
             body=body,
+            delivery_status=delivery_status,
         )
 
 
@@ -89,17 +112,25 @@ class Inbound:
 class Classification:
     verdict: Verdict
     reason: str = ""
-    # Set only for auto-responders: how long to pause before resuming.
+    # How long to pause before resuming. Set for auto-responders and for
+    # transient bounces - the two cases where the sequence continues later.
     defer: timedelta | None = None
+    # Whether this address is dead everywhere, for every user, permanently.
+    # True only for a parsed 5.x.x delivery status: a bounce recognised by
+    # subject or sender alone is never trustworthy enough to act on globally.
+    permanent: bool = False
 
     @property
     def stops_sequence(self) -> bool:
-        return self.verdict is not Verdict.AUTOREPLY
+        # A deferral is the whole of "not stopped". Keying off the verdict
+        # instead would have to name every deferring case, and did not survive
+        # transient bounces becoming one of them.
+        return self.defer is None
 
     @property
     def suppresses(self) -> bool:
         """Whether the address goes on the user's suppression list."""
-        return self.verdict in (Verdict.BOUNCE, Verdict.OPT_OUT)
+        return self.defer is None and self.verdict in (Verdict.BOUNCE, Verdict.OPT_OUT)
 
 
 def is_autoreply(inbound: Inbound) -> bool:
@@ -127,8 +158,33 @@ def opt_out_phrase(inbound: Inbound) -> str | None:
     return next((phrase for phrase in UNSUB_PHRASES if phrase in haystack), None)
 
 
+def dsn_status(inbound: Inbound) -> str | None:
+    """The RFC 3463 status from a delivery status notification, if there is one.
+
+    Read only from the `message/delivery-status` part, never from the body. A
+    bounce body routinely quotes the original message, and a quoted line
+    beginning "Status:" would be indistinguishable from the report's own.
+    """
+    match = DSN_STATUS_RE.search(inbound.delivery_status)
+    return ".".join(match.groups()) if match else None
+
+
+def is_permanent_bounce(status: str | None) -> bool:
+    """5.x.x means the mailbox will never accept mail. 4.x.x means not today."""
+    return bool(status) and status.startswith("5")
+
+
+def is_transient_bounce(status: str | None) -> bool:
+    return bool(status) and status.startswith("4")
+
+
 def bounced_addresses(inbound: Inbound) -> set[str]:
-    """Addresses named in a bounce body - the one that actually failed."""
+    """Addresses named in a bounce body - the one that actually failed.
+
+    Note this returns *every* address in the text, which includes the daemon's
+    and often the sender's own. Callers must not treat the result as a list of
+    dead mailboxes; the failed address is the one the sequence was aimed at.
+    """
     return {match.lower() for match in EMAIL_RE.findall(inbound.body)}
 
 
@@ -143,7 +199,24 @@ def classify(inbound: Inbound) -> Classification:
     message.
     """
     if is_bounce(inbound):
-        return Classification(Verdict.BOUNCE, inbound.subject[:200])
+        status = dsn_status(inbound)
+        if is_transient_bounce(status):
+            # Not a verdict on the address - a full mailbox or a greylisting
+            # server. Ending the sequence here would discard a good contact,
+            # and recording it globally would discard them for every user.
+            return Classification(
+                Verdict.BOUNCE,
+                f"{inbound.subject[:180]} (transient {status})",
+                defer=SOFT_BOUNCE_DEFER,
+            )
+        return Classification(
+            Verdict.BOUNCE,
+            inbound.subject[:200] if status is None else f"{inbound.subject[:180]} ({status})",
+            # Without a parsed status this is a bounce only because the subject
+            # or sender looked like one. Good enough to stop this sequence, not
+            # good enough to kill the address for everybody.
+            permanent=is_permanent_bounce(status),
+        )
 
     if is_autoreply(inbound):
         return Classification(

@@ -28,6 +28,22 @@ MAX_TOUCHES = 3
 # sending days, so a three-day gap over a weekend is still three working days.
 MIN_BUSINESS_DAYS_BETWEEN_TOUCHES = 3
 
+# A finished sequence may start again later, once, after a month. Somebody who
+# ignored three emails in April is not necessarily the same prospect in June -
+# the student may have shipped something, the company may have started hiring.
+#
+# The cap is the part that matters, not the interval. At a 30-day cooldown a
+# three-week sequence cycles roughly seven times a year, which is over twenty
+# emails from one student to one founder; MAX_CYCLES is what turns that into a
+# ceiling of six for good, however long the account lives.
+#
+# The reset works by putting `touches_sent` back to zero and counting the cycle
+# separately, which is also what keeps it inside the `touches_sent <=
+# MAX_TOUCHES` check constraint in the database. Letting the counter climb to
+# six instead would need a migration and would lose that protection.
+RESET_AFTER = timedelta(days=30)
+MAX_CYCLES = 2
+
 # Statuses from which nothing further may ever be sent. A reply or an opt-out
 # is permanent: re-adding the address later must be refused, not merely
 # re-scheduled.
@@ -80,22 +96,70 @@ def may_schedule_touch(
     status: str,
     touches_sent: int,
     verification: str | None = None,
+    cycles_used: int = 0,
+    last_cycle_ended_at: datetime | None = None,
+    now: datetime | None = None,
 ) -> TouchDecision:
     """Whether another touch may be scheduled for one target.
 
     Called both when a target is created and again in the worker immediately
     before a send, because state can change between the two - the point of the
     reply-tracking layers is that it often does.
+
+    A completed sequence is not necessarily the end. Once the cooldown has
+    passed it may cycle, up to `MAX_CYCLES` - but only from a *silent* target.
+    `TERMINAL_STATUSES` is checked first and covers replied, bounced, opted out
+    and suppressed, so a cycle can never revive someone who answered or whose
+    address failed. That ordering is the safety property; do not reorder it.
     """
     if status in TERMINAL_STATUSES:
         return TouchDecision(False, f"target is {status} - the sequence ended permanently")
-    if touches_sent >= MAX_TOUCHES:
-        return TouchDecision(
-            False, f"{touches_sent} of {MAX_TOUCHES} touches already sent"
-        )
     if verification == "undeliverable":
         return TouchDecision(False, "address is undeliverable")
+    if touches_sent >= MAX_TOUCHES:
+        return _may_start_new_cycle(cycles_used, last_cycle_ended_at, now)
     return TouchDecision(True)
+
+
+def _may_start_new_cycle(
+    cycles_used: int,
+    last_cycle_ended_at: datetime | None,
+    now: datetime | None,
+) -> TouchDecision:
+    if cycles_used >= MAX_CYCLES:
+        return TouchDecision(
+            False,
+            f"{cycles_used} of {MAX_CYCLES} sequences already sent - that is the end of it",
+        )
+    if last_cycle_ended_at is None or now is None:
+        # Nothing recorded the end of the last run, so there is no cooldown to
+        # measure. Refuse rather than guess: the caller that wants a cycle is
+        # the one that has to say when the previous one finished.
+        return TouchDecision(False, f"{MAX_TOUCHES} touches already sent")
+    waited = now - last_cycle_ended_at
+    if waited < RESET_AFTER:
+        remaining = (RESET_AFTER - waited).days
+        return TouchDecision(False, f"the sequence ended - it may resume in {remaining}d")
+    return TouchDecision(True)
+
+
+def starts_new_cycle(
+    *,
+    touches_sent: int,
+    cycles_used: int,
+    last_cycle_ended_at: datetime | None,
+    now: datetime,
+) -> bool:
+    """Whether the next allowed touch begins a fresh sequence.
+
+    Callers need this separately from `may_schedule_touch` because a cycle
+    boundary is a write, not just a permission: `touches_sent` goes back to
+    zero and `cycles_used` goes up. Asking the same question twice in two
+    places is how the two would drift.
+    """
+    return touches_sent >= MAX_TOUCHES and _may_start_new_cycle(
+        cycles_used, last_cycle_ended_at, now
+    ).allowed
 
 
 def remaining_touches(touches_sent: int) -> int:

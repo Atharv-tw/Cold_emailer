@@ -24,6 +24,9 @@ const STATUS_LABEL: Record<ImportRowStatus, string> = {
   needs_hook: "Needs a reason",
   duplicate: "Already on your list",
   suppressed: "Do-not-contact",
+  // Not the user's decision, unlike "Do-not-contact": mail to this address has
+  // already bounced for somebody, so the mailbox is not there to write to.
+  undeliverable: "Address does not exist",
   invalid: "No valid email",
 };
 
@@ -172,6 +175,8 @@ export default function ImportWizard() {
                 {summary.needs_hook > 0 && ` · ${summary.needs_hook} still need a reason`}
                 {summary.duplicates > 0 && ` · ${summary.duplicates} already on your list`}
                 {summary.suppressed > 0 && ` · ${summary.suppressed} on do-not-contact`}
+                {summary.undeliverable > 0 &&
+                  ` · ${summary.undeliverable} whose address does not exist`}
                 {summary.invalid > 0 && ` · ${summary.invalid} without a valid email`}
               </p>
             </section>
@@ -195,9 +200,9 @@ export default function ImportWizard() {
                   }`}
             </button>
             <p className="muted">
-              Rows that are duplicates, suppressed, or missing an email are
-              skipped. Rows missing only a reason are imported — you add the
-              reason before writing to them.
+              Rows that are duplicates, suppressed, undeliverable, or missing an
+              email are skipped. Rows missing only a reason are imported — you
+              add the reason before writing to them.
             </p>
           </section>
         </>

@@ -9,6 +9,9 @@ The decision logic lives in `outreach_core.limits`; this is the storage side.
 The table holds a keyed HMAC of the address and a count - no addresses, and
 no per-send log, because keeping one would rebuild exactly the cross-user
 record of who is being emailed that the hashing exists to avoid.
+
+**Currently in monitor mode - see `ENFORCE`.** Counts are still recorded, but
+nothing is refused on the strength of them.
 """
 
 from __future__ import annotations
@@ -25,8 +28,22 @@ from ..models import RecipientGuardRow
 
 POLICY = RecipientGuard()
 
+# Monitor mode. `record_contact` keeps writing, so the table still accumulates
+# a true picture of which addresses many accounts are converging on; the two
+# read paths simply decline to act on it. Blocking is off deliberately, not by
+# oversight: with a shared contact pool the guard would refuse adds before
+# there is enough traffic to know where the real thresholds are, so the counts
+# are gathered first and the decision made against data.
+#
+# Flipping this to True restores enforcement everywhere at once - the call
+# sites in `routers/targets.py`, `routers/import_leads.py` and
+# `services/sending.py` are left intact for exactly that reason.
+ENFORCE = False
+
 
 async def is_blocked(session: AsyncSession, email: str, secret: bytes, *, now: datetime | None = None) -> bool:
+    if not ENFORCE:
+        return False
     now = now or datetime.now(timezone.utc)
     key = recipient_key(email, secret)
     row = await session.scalar(
@@ -50,7 +67,11 @@ async def blocked_emails(
     checks every row it is about to add, and doing that as N round-trips would
     make a large file slow for no reason. Returns the blocked addresses as they
     were passed in, so the caller can match them back to rows.
+
+    Empty while `ENFORCE` is off, which also skips the query entirely.
     """
+    if not ENFORCE:
+        return set()
     now = now or datetime.now(timezone.utc)
     by_key = {recipient_key(email, secret): email for email in emails if email}
     if not by_key:

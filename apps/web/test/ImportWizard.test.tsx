@@ -26,7 +26,10 @@ const PREVIEW: ImportPreview = {
     { index: 1, name: "Alex", email: "alex@example.com", company: "Acme", role: "", status: "ok", issues: [], importable: true },
     { index: 2, name: "Sam", email: "sam@nope", company: "", role: "", status: "invalid", issues: ["not a valid email address"], importable: false },
   ],
-  summary: { total: 2, importable: 1, needs_hook: 0, duplicates: 0, suppressed: 0, invalid: 1 },
+  summary: {
+    total: 2, importable: 1, needs_hook: 0, duplicates: 0,
+    suppressed: 0, undeliverable: 0, invalid: 1,
+  },
 };
 
 function csv(): File {

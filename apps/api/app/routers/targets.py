@@ -21,6 +21,7 @@ from ..models import Event, Profile, ProfileExperience, ProfileProject, Suppress
 from ..schemas import TargetIn, TargetOut, TargetUpdate
 from ..services import guard
 from ..services.completeness import assess
+from ..services.replies import is_dead_address
 from ..services.verification import EmailVerifier, normalise
 
 router = APIRouter(prefix="/v1/targets", tags=["targets"])
@@ -36,6 +37,16 @@ TERMINAL_EXPLANATIONS = {
 
 def _out(target: Target) -> TargetOut:
     verification = target.verification or {}
+    # One decision, read twice below. Computed once so `can_send` and
+    # `blocked_reason` cannot disagree about the same target.
+    decision = may_schedule_touch(
+        status=target.status,
+        touches_sent=target.touches_sent,
+        verification=verification.get("status"),
+        cycles_used=target.cycles_used,
+        last_cycle_ended_at=target.last_cycle_ended_at,
+        now=datetime.now(timezone.utc),
+    )
     return TargetOut(
         id=str(target.id),
         name=target.name,
@@ -54,16 +65,8 @@ def _out(target: Target) -> TargetOut:
         touches_sent=target.touches_sent,
         touches_remaining=remaining_touches(target.touches_sent),
         last_touch_at=target.last_touch_at,
-        can_send=may_schedule_touch(
-            status=target.status,
-            touches_sent=target.touches_sent,
-            verification=verification.get("status"),
-        ).allowed,
-        blocked_reason=may_schedule_touch(
-            status=target.status,
-            touches_sent=target.touches_sent,
-            verification=verification.get("status"),
-        ).reason,
+        can_send=decision.allowed,
+        blocked_reason=decision.reason,
     )
 
 
@@ -128,12 +131,15 @@ async def list_targets(
     return [_out(row) for row in rows]
 
 
-@router.post("", response_model=TargetOut, status_code=status.HTTP_201_CREATED)
-async def create_target(
-    payload: TargetIn, user: CurrentUser, session: Db, settings: SettingsDep
-) -> TargetOut:
-    email = normalise(payload.email)
+async def ensure_addable(session, user, email: str, settings) -> None:
+    """Every gate a new target must pass, wherever it came from.
 
+    Shared by single-add and by taking someone out of the shared pool. The two
+    entry points must not be allowed to drift: these checks are what stop a
+    user writing to the same person twice, or to someone who asked to be left
+    alone, and a second code path that forgot one of them would not fail
+    loudly - it would just quietly send the email.
+    """
     if email == normalise(user.email):
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "That is your own address.")
 
@@ -149,6 +155,16 @@ async def create_target(
         raise HTTPException(
             status.HTTP_409_CONFLICT,
             f"You cannot contact {email} again: {suppressed.reason or 'they opted out'}.",
+        )
+
+    # Dead for everyone, not just for this user. Refused at add time for the
+    # same reason a suppression is: finding out now beats finding out six days
+    # later when the send fails.
+    if await is_dead_address(session, email):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            f"{email} does not exist - mail to it has already hard-bounced. "
+            "Check the address, or pick someone else.",
         )
 
     existing = await session.scalar(
@@ -168,7 +184,8 @@ async def create_target(
         )
 
     # Cross-user guard. Checked here as well as at send time so the user is not
-    # told six days later that this one was never going to go out.
+    # told six days later that this one was never going to go out. Currently in
+    # monitor mode, so this returns False - see services/guard.py.
     if await guard.is_blocked(session, email, settings.recipient_guard_secret_bytes):
         raise HTTPException(
             status.HTTP_409_CONFLICT,
@@ -176,6 +193,14 @@ async def create_target(
             "moment, so this platform is not sending them anything further "
             "right now. Try again in a week.",
         )
+
+
+@router.post("", response_model=TargetOut, status_code=status.HTTP_201_CREATED)
+async def create_target(
+    payload: TargetIn, user: CurrentUser, session: Db, settings: SettingsDep
+) -> TargetOut:
+    email = normalise(payload.email)
+    await ensure_addable(session, user, email, settings)
 
     verifier = EmailVerifier(
         api_key=settings.quickemailverification_api_key,

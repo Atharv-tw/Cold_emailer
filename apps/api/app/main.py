@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .db import engine
 from .routers import (
     analytics, auth, dashboard, drafts, gmail_push, health, import_leads, messages, ops,
-    profile, resumes, send, targets, templates,
+    pool, profile, resumes, send, targets, templates,
 )
 from .settings import get_settings
 
@@ -58,6 +58,7 @@ app.include_router(auth.router)
 app.include_router(profile.router)
 app.include_router(resumes.router)
 app.include_router(targets.router)
+app.include_router(pool.router)
 app.include_router(templates.router)
 app.include_router(import_leads.router)
 app.include_router(drafts.router)

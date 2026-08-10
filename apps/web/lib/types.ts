@@ -77,6 +77,27 @@ export type Verification = {
   checked_at?: string;
 };
 
+/**
+ * A person in the shared pool, before anyone has taken them.
+ *
+ * No `hook` and no `status`: both belong to one user's outreach rather than to
+ * the person, and a pool row has neither until it is added to a list.
+ */
+export type PoolContact = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  company: string;
+  company_description: string;
+  company_website: string;
+  target_type: string;
+  company_type: string;
+  timezone: string;
+  links: Record<string, string>;
+  verification: Verification;
+};
+
 export type Target = {
   id: string;
   name: string;
@@ -177,6 +198,9 @@ export type ImportRowStatus =
   | "needs_hook"
   | "duplicate"
   | "suppressed"
+  // Hard-bounced for somebody on this platform, so nobody can import it.
+  // Distinct from `suppressed`, which is this user's own choice.
+  | "undeliverable"
   | "invalid";
 
 export type ImportRow = {
@@ -196,6 +220,7 @@ export type ImportSummary = {
   needs_hook: number;
   duplicates: number;
   suppressed: number;
+  undeliverable: number;
   invalid: number;
 };
 
