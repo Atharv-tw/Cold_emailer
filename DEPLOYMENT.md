@@ -100,10 +100,15 @@ a recent `tick` means one is already running somewhere else.
 
 ### Running it on a host separate from the API
 
+This describes the split topology - API on a managed platform, worker on its
+own box - which is **not** the current arrangement; see "Running the whole
+stack on one host" below. It is kept because `infra/outreach-worker.service`
+is the rollback path, and because the constraints in it still apply to any
+host running the worker.
+
 The worker takes no inbound connections - it only dials out to Postgres and
 Redis - so when both are managed services it needs no reverse proxy, no
-published port, and no container. A systemd unit is enough;
-`infra/outreach-worker.service` is the one in use.
+published port, and no container. A systemd unit is enough.
 
 ```bash
 uv python install 3.10 && uv venv --python 3.10 .venv
@@ -160,6 +165,63 @@ Managed Redis is usually billed per command, and arq polls continuously -
 commands a day doing nothing. Raising it to `5.0` cuts that roughly tenfold and
 costs only a few seconds of enqueue latency, which no job here is sensitive to.
 
+### Running the whole stack on one host (Docker Compose)
+
+The current arrangement. Postgres, Redis, the API and the worker run as one
+compose project on a self-hosted box; only the web app stays on Vercel.
+`infra/docker-compose.prod.yml` is that stack, and both Python services share
+the single image built by `infra/Dockerfile.api`.
+
+What this buys: no cold starts, no per-command Redis billing, and no storage
+ceiling. What it costs: the host is now a single point of failure for the whole
+product rather than just for sending, and backups become yours (section 8).
+
+```bash
+docker compose -f infra/docker-compose.prod.yml --env-file .env up -d postgres redis
+docker compose -f infra/docker-compose.prod.yml --env-file .env run --rm api alembic upgrade head
+docker compose -f infra/docker-compose.prod.yml --env-file .env up -d --build api worker
+```
+
+Run it from the repo root. Compose resolves `${POSTGRES_PASSWORD}` against the
+project directory, which would otherwise be `infra/` - `--env-file` sets where
+that interpolation reads from, while the `env_file:` inside the compose file is
+what the containers themselves get.
+
+Four things that are easy to get wrong here:
+
+- **`APP_DB_PASSWORD` must be set before migrating.** Migration `0002` reads it
+  when creating `outreach_app` and falls back to the literal string
+  `outreach_app`.
+- **The image installs editable, and the repo layout inside it is
+  load-bearing.** `settings.py` derives `REPO_ROOT` from `parents[3]` of its own
+  path; flattened into site-packages that resolves inside the interpreter.
+- **Exactly one worker, still.** Before starting the compose worker, confirm no
+  systemd unit and no stray `arq` process is running against the same database -
+  `MAX_SENDS_PER_TICK` is per-process, so a second one doubles the send rate
+  past a limiter that never sees it.
+- **Neither Postgres nor Redis publishes a port.** The dev `docker-compose.yml`
+  maps 5432 with the password `outreach`, which is fine on a laptop and would be
+  an open database on a shared network. Only the API publishes, and only on
+  `127.0.0.1`.
+
+### Reaching it from the internet
+
+The API needs a public HTTPS origin: Vercel's servers cannot reach a private
+address, and Google posts Pub/Sub notifications from the internet. Either a
+reverse proxy with a certificate, or a Cloudflare tunnel - see
+`infra/cloudflared-ingress.yml` for the tunnel form, which needs neither a
+certificate nor an open inbound port.
+
+Whatever sits in front terminates TLS and forwards plain HTTP, which is why
+uvicorn runs with `--proxy-headers`. Note that traffic reaching a published
+container port arrives from the Docker bridge gateway, not `127.0.0.1`, so
+`--forwarded-allow-ips` cannot be narrowed to loopback; binding the published
+port to `127.0.0.1` is what limits who can reach it.
+
+Only `API_BASE_URL` changes when the API moves. The OAuth redirect URI is
+derived from `WEB_ORIGIN`, so as long as the web app stays put, nothing in the
+Google Console needs touching except the Pub/Sub push subscription.
+
 ## 5. Google OAuth
 
 One OAuth client (Web application). The consent screen stays in **testing** mode:
@@ -200,7 +262,9 @@ stale "have they replied yet" is worse than one that fails to load.
 
 - **Postgres is the source of truth** - the schedule, targets, threads, and
   encrypted refresh tokens all live here. Take regular `pg_dump` backups and
-  test a restore.
+  test a restore. On the self-hosted stack this is not optional and nothing
+  else is doing it for you: `infra/backup-db.sh` dumps and rotates, and is
+  meant to run from cron.
 - Backups contain encrypted refresh tokens but **not** `MASTER_KEY`. A restore
   is only useful alongside the same `MASTER_KEY`; back that key up separately and
   never in the database.

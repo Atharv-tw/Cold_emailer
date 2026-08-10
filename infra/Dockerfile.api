@@ -1,0 +1,42 @@
+# syntax=docker/dockerfile:1
+
+# 3.10 explicitly. That is what the suite passes on, and the host's system
+# Python is 3.14 - see DEPLOYMENT.md section 4. One image serves both the API
+# and the worker; they share a codebase and must run the same environment.
+FROM python:3.10-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+# Editable, and with the repo layout preserved, both on purpose: settings.py
+# derives REPO_ROOT from parents[3] of its own path to find the root .env
+# (settings.py:22). Installed flat into site-packages, that resolves to
+# somewhere inside the interpreter and the root .env is never found.
+#
+# psycopg[binary] and cryptography ship wheels, so no build toolchain here.
+COPY packages/core ./packages/core
+COPY apps/api ./apps/api
+
+RUN pip install -e ./packages/core -e ./apps/api
+
+# storage_dir defaults to ./var/storage, resolved against the working
+# directory (settings.py:102), so the WORKDIR below is load-bearing.
+WORKDIR /app/apps/api
+RUN mkdir -p var/storage
+
+EXPOSE 8000
+
+# Not run_api.py: its Windows event-loop shims are dead weight on Linux, and
+# it binds 127.0.0.1 by default - inside a container that means nothing
+# outside can reach it.
+#
+# --proxy-headers because cloudflared terminates TLS and forwards plain HTTP.
+# Without it the app sees scheme=http and builds http:// URLs for a service
+# that is only ever reached over https.
+CMD ["uvicorn", "app.main:app", \
+     "--host", "0.0.0.0", "--port", "8000", \
+     "--proxy-headers", "--forwarded-allow-ips", "*"]
