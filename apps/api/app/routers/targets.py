@@ -231,7 +231,16 @@ async def create_target(
             user_id=user.id,
             target_id=target.id,
             type="target_created",
-            detail=f"verification: {verification.status} ({verification.reason})",
+            # Nothing at all when the checker is switched off. "verification:
+            # unknown (verification_not_configured)" is a fact about the
+            # deployment, not about this address, and the history is a record
+            # of what happened to this person. The banner on the target page
+            # suppresses the same verdict for the same reason.
+            detail=(
+                ""
+                if verification.reason == "verification_not_configured"
+                else f"verification: {verification.status} ({verification.reason})"
+            ),
         )
     )
     await session.commit()
