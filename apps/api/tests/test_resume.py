@@ -61,7 +61,12 @@ def make_pdf(lines: list[str]) -> bytes:
     return _assemble_pdf(content.encode("latin-1"))
 
 
-def _assemble_pdf(stream: bytes, base_font: bytes = b"Helvetica") -> bytes:
+def _assemble_pdf(
+    stream: bytes,
+    base_font: bytes = b"Helvetica",
+    extra_objects: tuple[bytes, ...] = (),
+    trailer_extra: bytes = b"",
+) -> bytes:
     objects = [
         b"<< /Type /Catalog /Pages 2 0 R >>",
         b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
@@ -69,6 +74,7 @@ def _assemble_pdf(stream: bytes, base_font: bytes = b"Helvetica") -> bytes:
         b"/Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
         b"<< /Length " + str(len(stream)).encode() + b" >>\nstream\n" + stream + b"\nendstream",
         b"<< /Type /Font /Subtype /Type1 /BaseFont /" + base_font + b" >>",
+        *extra_objects,
     ]
 
     out = bytearray(b"%PDF-1.4\n")
@@ -82,8 +88,36 @@ def _assemble_pdf(stream: bytes, base_font: bytes = b"Helvetica") -> bytes:
     out += b"0000000000 65535 f \n"
     for offset in offsets:
         out += f"{offset:010d} 00000 n \n".encode()
-    out += f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_at}\n%%EOF\n".encode()
+    out += (
+        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R ".encode()
+        + trailer_extra
+        + f">>\nstartxref\n{xref_at}\n%%EOF\n".encode()
+    )
     return bytes(out)
+
+
+def make_password_protected_pdf(lines: list[str]) -> bytes:
+    """A structurally valid PDF whose contents are locked behind a password.
+
+    The /O and /U strings are deliberately not derivable from the empty
+    password, so the standard security handler rejects the empty-password
+    retry that pdfplumber does on its own - which is the case a real
+    password-protected upload hits.
+    """
+    def escape(text: str) -> str:
+        return text.replace("\\", r"\\").replace("(", r"\(").replace(")", r"\)")
+
+    content = "BT /F1 12 Tf 72 720 Td 14 TL\n"
+    content += "".join(f"({escape(line)}) Tj T*\n" for line in lines)
+    content += "ET"
+    return _assemble_pdf(
+        content.encode("latin-1"),
+        extra_objects=(
+            b"<< /Filter /Standard /V 1 /R 2 /P -1 "
+            b"/O <" + b"AB" * 32 + b"> /U <" + b"CD" * 32 + b"> >>",
+        ),
+        trailer_extra=b"/Encrypt 6 0 R /ID [<" + b"11" * 16 + b"> <" + b"11" * 16 + b">] ",
+    )
 
 
 def make_glyph_positioned_pdf(lines: list[str]) -> bytes:
@@ -204,8 +238,16 @@ class TestExtraction(unittest.TestCase):
             extract_text(b"just some text " * 50, "resume.txt")
 
     def test_corrupt_pdf_is_rejected(self):
-        with self.assertRaises(ResumeError):
+        with self.assertRaises(ResumeError) as ctx:
             extract_text(b"%PDF-1.4\nnot really a pdf at all\n" * 20, "broken.pdf")
+        self.assertIn("may be corrupted", str(ctx.exception))
+
+    def test_password_protected_pdf_is_reported_as_such(self):
+        # Distinct from corruption: the file is fine, the user just has to
+        # unlock it, and telling them to re-export would send them nowhere.
+        with self.assertRaises(ResumeError) as ctx:
+            extract_text(make_password_protected_pdf(RESUME_LINES), "locked.pdf")
+        self.assertIn("password protected", str(ctx.exception))
 
     def test_type_is_sniffed_when_the_name_lies(self):
         # A PDF uploaded as "resume" with no extension still reads.
@@ -294,7 +336,7 @@ class TestGemini(unittest.TestCase):
     def test_missing_key_is_refused_before_any_request(self):
         with self.assertRaises(AIError) as ctx:
             asyncio.run(GeminiClient(api_key="").parse_resume("text"))
-        self.assertIn("GEMINI_API_KEY", str(ctx.exception))
+        self.assertIn("No Gemini API key was provided", str(ctx.exception))
 
     def test_empty_text_is_refused(self):
         with self.assertRaises(AIError):

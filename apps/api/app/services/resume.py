@@ -92,17 +92,25 @@ def _extract_pdf(data: bytes) -> Extracted:
     import pdfplumber
     from pdfminer.pdfdocument import PDFPasswordIncorrect
     from pdfminer.pdfparser import PDFSyntaxError
+    from pdfplumber.utils.exceptions import PdfminerException
 
     try:
         pdf = pdfplumber.open(io.BytesIO(data))
-    except PDFPasswordIncorrect as exc:
-        # pdfplumber retries with an empty password itself, so getting here
-        # means a real one rather than "protected but not really".
-        raise ResumeError(
-            "That PDF is password protected. Remove the password and upload it "
-            "again."
-        ) from exc
-    except (PDFSyntaxError, ValueError, TypeError) as exc:
+    except (
+        PdfminerException, PDFPasswordIncorrect, PDFSyntaxError, ValueError, TypeError
+    ) as exc:
+        # pdfplumber wraps everything open() raises in PdfminerException, which
+        # descends from plain Exception - so the type in hand says nothing about
+        # what went wrong and the reason has to come from the wrapped cause. The
+        # unwrapped types stay in the tuple in case that wrapping ever stops.
+        cause = exc.args[0] if isinstance(exc, PdfminerException) and exc.args else exc
+        if isinstance(cause, PDFPasswordIncorrect):
+            # pdfplumber retries with an empty password itself, so getting here
+            # means a real one rather than "protected but not really".
+            raise ResumeError(
+                "That PDF is password protected. Remove the password and upload it "
+                "again."
+            ) from exc
         raise ResumeError(
             "That PDF could not be opened - it may be corrupted. Try "
             "re-exporting it."

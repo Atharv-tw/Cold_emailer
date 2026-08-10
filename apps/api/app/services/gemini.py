@@ -144,7 +144,7 @@ class AIError(Exception):
 @dataclass(frozen=True)
 class GeminiClient:
     api_key: str
-    model: str = "gemini-3.6-flash"
+    model: str = "gemini-2.5-flash"
     endpoint: str = "https://generativelanguage.googleapis.com/v1beta"
     # Injectable so the error mapping and the parser can be tested against
     # real Gemini response shapes without a network or an API key. Prompt
