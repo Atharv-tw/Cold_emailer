@@ -27,6 +27,7 @@ async def ping() -> dict[str, str]:
     return {"ping": "pong"}
 
 
+@router.head("/readyz")
 @router.get("/readyz")
 async def readyz(settings: SettingsDep) -> dict[str, object]:
     checks: dict[str, object] = {}
