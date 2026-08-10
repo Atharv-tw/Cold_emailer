@@ -4,8 +4,9 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import PoolAddButton from "@/components/PoolAddButton";
 import PoolFilters from "@/components/PoolFilters";
+import PoolLocked from "@/components/PoolLocked";
 import { api } from "@/lib/api";
-import type { PoolContact } from "@/lib/types";
+import type { Billing, PoolContact, SessionUser } from "@/lib/types";
 
 type Search = Record<string, string | string[] | undefined>;
 
@@ -23,6 +24,21 @@ export default async function PoolPage({
 }) {
   const session = await auth();
   if (!session?.apiUser) redirect("/");
+
+  // Fresh, not from the sign-in JWT - see the desktop page for why.
+  const me = await api<SessionUser>("/v1/auth/me");
+  if (!me.is_paid) {
+    const billing = await api<Billing>("/v1/billing").catch(() => null);
+    return (
+      <main>
+        <h1>Contact pool</h1>
+        <p>
+          <Link href="/dashboard">← Dashboard</Link>
+        </p>
+        <PoolLocked status={billing?.request_status ?? ""} />
+      </main>
+    );
+  }
 
   const params = await searchParams;
   const query = new URLSearchParams();

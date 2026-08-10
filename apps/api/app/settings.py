@@ -101,6 +101,48 @@ class Settings(BaseSettings):
 
     storage_dir: str = "./var/storage"
 
+    # Where payment claims are reviewed. The proof email goes here, and it is
+    # the only address that ever learns a purchase happened.
+    admin_notify_email: str = ""
+
+    # The QR is built in the browser from these, so the amount is never typed
+    # by hand into a payment app. Price is server-controlled on purpose: it
+    # reaches the client as data, not as something the client may choose.
+    upi_id: str = ""
+    upi_payee_name: str = ""
+    pool_price_inr: int = 0
+
+    # Cloudflare R2, S3-compatible. Payment screenshots live here rather than
+    # in storage_dir because they are records worth keeping, and storage_dir is
+    # documented as disposable - resumes are deleted once parsed.
+    r2_account_id: str = ""
+    r2_access_key_id: str = ""
+    r2_secret_access_key: str = ""
+    r2_bucket: str = ""
+
+    @property
+    def r2_endpoint(self) -> str:
+        return f"https://{self.r2_account_id}.r2.cloudflarestorage.com"
+
+    @property
+    def r2_configured(self) -> bool:
+        return bool(
+            self.r2_account_id
+            and self.r2_access_key_id
+            and self.r2_secret_access_key
+            and self.r2_bucket
+        )
+
+    @property
+    def billing_configured(self) -> bool:
+        """Whether a user could actually complete a purchase.
+
+        Checked before the purchase page offers anything, so a half-configured
+        deployment shows "not available yet" rather than a QR that pays nobody
+        or an upload that vanishes.
+        """
+        return bool(self.upi_id and self.pool_price_inr > 0 and self.r2_configured)
+
     @field_validator("session_secret", "recipient_guard_secret")
     @classmethod
     def _secret_is_long_enough(cls, value: str, info) -> str:

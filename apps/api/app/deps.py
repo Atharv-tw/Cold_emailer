@@ -62,6 +62,26 @@ CurrentUserId = Annotated[uuid.UUID, Depends(current_user_id)]
 Db = Annotated[AsyncSession, Depends(db)]
 
 
+async def admin_user(user: Annotated[User, Depends(current_user)]) -> User:
+    """The operator, for routes that act across accounts.
+
+    `is_admin` is set by hand in SQL and by nothing else - no handler anywhere
+    accepts it in a payload - so this reads a column the request could not have
+    influenced. That is the whole guarantee: there is no path from "signed in"
+    to "privileged", and a bug in an admin route therefore cannot create one.
+
+    403 rather than 404: hiding that the routes exist would only obscure them
+    from someone already authenticated, and an honest refusal is easier to
+    debug than a lie.
+    """
+    if not user.is_admin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "not an admin")
+    return user
+
+
+AdminUser = Annotated[User, Depends(admin_user)]
+
+
 async def gemini_api_key(
     x_gemini_api_key: Annotated[str | None, Header(alias="X-Gemini-Api-Key")] = None,
 ) -> str:

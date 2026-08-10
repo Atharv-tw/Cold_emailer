@@ -25,12 +25,20 @@ from .targets import _out, ensure_addable
 
 router = APIRouter(prefix="/v1/pool", tags=["pool"])
 
-# The pool may become a paid tier. This is deliberately a separate check from
-# "is this contact public": visibility is a property of the data, access is a
-# property of the account, and folding one into the other means reworking the
-# schema the day pricing arrives.
+# The pool is a paid tier. This is deliberately a separate check from "is this
+# contact public": visibility is a property of the data, access is a property
+# of the account, and folding one into the other means reworking the schema the
+# day pricing changes.
+#
+# 402 rather than 403: the caller is authenticated and permitted in principle,
+# they simply have not paid. The web app never provokes this - it reads
+# `is_paid` from the session and renders a locked page instead - so reaching
+# here means a direct call, which is exactly the case worth refusing.
 async def require_pool_access(user) -> None:
-    return None
+    if not user.is_paid:
+        raise HTTPException(
+            status.HTTP_402_PAYMENT_REQUIRED, "The contact pool is a paid feature."
+        )
 
 
 def _contact_out(contact: Contact) -> PoolContactOut:

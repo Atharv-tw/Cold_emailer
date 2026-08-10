@@ -48,6 +48,21 @@ worker must share it.
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | for web push | Optional; the dashboard "due today" list is the real mechanism. |
 | `STORAGE_DIR` | yes | Where uploaded resumes are written before parsing. |
 | `ENVIRONMENT` | yes | Set to `production`; makes the session cookie `Secure`. |
+| `ADMIN_NOTIFY_EMAIL` | for the paid pool | Where payment claims are announced. |
+| `UPI_ID` / `UPI_PAYEE_NAME` / `POOL_PRICE_INR` | for the paid pool | Build the QR. Unset any of them and the purchase page says "not available yet". |
+| `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET` | for the paid pool | Private bucket for payment screenshots. |
+
+The pool is a paid tier and there is no payment gateway: a user pays by UPI,
+uploads a screenshot, and an operator approves the claim in `/admin`. The proof
+email goes out through the *paying user's own* Gmail grant, because this service
+has no mailbox of its own.
+
+**The first operator is made in SQL, and that is the design.** No endpoint reads
+or writes `is_admin`, which is what guarantees no request can escalate to it:
+
+```sql
+UPDATE users SET is_admin = true WHERE email = '...';
+```
 
 `GET /readyz` reports whether the database is reachable and whether
 `MASTER_KEY`, `SESSION_SECRET`, `RECIPIENT_GUARD_SECRET` and `GOOGLE_CLIENT_ID`
@@ -272,6 +287,10 @@ stale "have they replied yet" is worse than one that fails to load.
   the next `tick`/`reconcile` re-derives from Postgres; no backup needed.
 - `STORAGE_DIR` holds resume files only until they are parsed (deleted unless the
   user kept the original), so it is not critical to back up.
+- Payment screenshots are **not** in `STORAGE_DIR` - they are in R2, precisely so
+  the sentence above stays true. R2's own durability is their backup; what the
+  database holds is the object key, and a restore without the bucket leaves
+  claims pointing at images that are gone.
 - The calendar layer is a mirror, not a backup: if events are lost, the next
   `sync_calendars` pass recreates them from the schedule.
 

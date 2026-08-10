@@ -3,9 +3,10 @@ import Link from "next/link";
 import Avatar from "@/components/Avatar";
 import PoolAddButton from "@/components/PoolAddButton";
 import PoolFilters from "@/components/PoolFilters";
+import PoolLocked from "@/components/PoolLocked";
 import { api } from "@/lib/api";
 import { requireAuth } from "@/lib/auth-guard";
-import type { PoolContact } from "@/lib/types";
+import type { Billing, PoolContact, SessionUser } from "@/lib/types";
 
 type Search = Record<string, string | string[] | undefined>;
 
@@ -23,6 +24,25 @@ export default async function PoolPage({
   searchParams: Promise<Search>;
 }) {
   await requireAuth();
+
+  // Asked fresh rather than read off the sign-in JWT, which only refreshes at
+  // sign-in - so an approval made a minute ago takes effect on this
+  // navigation rather than after the user signs out and back in.
+  const me = await api<SessionUser>("/v1/auth/me");
+  if (!me.is_paid) {
+    const billing = await api<Billing>("/v1/billing").catch(() => null);
+    return (
+      <>
+        <div className="page-header">
+          <div>
+            <h1>Contact pool</h1>
+            <p>A shared list of founders and hiring leads</p>
+          </div>
+        </div>
+        <PoolLocked status={billing?.request_status ?? ""} />
+      </>
+    );
+  }
 
   const params = await searchParams;
   const query = new URLSearchParams();

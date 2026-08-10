@@ -52,6 +52,12 @@ class SessionOut(BaseModel):
     profile_complete: bool
     # Whether the optional calendar-reminder scope was granted.
     calendar_connected: bool = False
+    # Entitlement and role. The web app fetches this endpoint on every page
+    # load rather than trusting the sign-in JWT, so these are the freshest
+    # answer available - a grant made in the admin panel takes effect on the
+    # user's next navigation rather than their next sign-in.
+    is_paid: bool = False
+    is_admin: bool = False
 
 
 def _session_out(
@@ -77,6 +83,8 @@ def _session_out(
         missing_scopes=missing,
         profile_complete=bool(profile and profile.headline and profile.bio),
         calendar_connected=has_calendar_scope(scopes),
+        is_paid=user.is_paid,
+        is_admin=user.is_admin,
     )
 
 

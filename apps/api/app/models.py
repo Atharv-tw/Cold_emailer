@@ -66,6 +66,20 @@ class User(Base, TimestampMixin):
     disconnected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     disconnected_reason: Mapped[str] = mapped_column(Text, default="")
 
+    # Whether this account may use the shared contact pool. Deliberately not
+    # derived from anything: `owner_user_id IS NULL` says a contact is public,
+    # which is a property of the data, and this says the account is allowed to
+    # see it, which is a property of the billing relationship. Conflating them
+    # means reworking the schema the day pricing changes.
+    is_paid: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+
+    # Set by hand, in SQL, and by nothing else. No endpoint reads this from a
+    # payload or writes it, which is what stops the admin panel from being a
+    # route to becoming an admin: there is no code path from "signed in" to
+    # "privileged", so a bug in those handlers cannot manufacture one. The
+    # first admin is a one-off UPDATE, and that chicken-and-egg is the point.
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+
     profile: Mapped["Profile | None"] = relationship(back_populates="user", uselist=False)
 
 
@@ -482,6 +496,59 @@ class PushSubscription(Base, TimestampMixin):
     keys: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
 
 
+class PaymentRequest(Base, TimestampMixin):
+    """One claim that a user has paid, waiting to be believed.
+
+    Payment happens entirely outside this system: the user scans a UPI QR, pays
+    from their own bank app, and uploads a screenshot as evidence. Nothing here
+    verifies money moved - an operator looks at the screenshot and decides. So
+    this table is a queue of claims, not a ledger of payments, and `status` is
+    a human's verdict rather than a gateway's.
+
+    The screenshot itself lives in object storage; only its key is here. A
+    presigned URL is minted per view and expires, so there is no long-lived
+    link to an image that typically shows the payer's UPI handle, phone number
+    and bank.
+
+    **This table has no row-level security**, deliberately, which makes it the
+    exception in this file. The operator has to list claims across all users,
+    and the uniform policy is `user_id = current_setting('app.user_id')` - under
+    which an unbound session sees zero rows rather than all of them, so there is
+    no session that could serve that listing. Access is enforced in the router
+    instead. The consequence is that **the user-facing read must filter by
+    `user_id` in the query itself**: unlike everywhere else here, forgetting it
+    fails open. If that trade stops being worth it, the shape to copy is
+    `contacts` - per-command policies keyed on an `app.is_admin` setting bound
+    alongside `app.user_id`.
+    """
+
+    __tablename__ = "payment_requests"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+
+    # An object key, never a URL. URLs here expire; keys do not.
+    screenshot_key: Mapped[str] = mapped_column(Text, nullable=False)
+    # Whatever reference the user chose to type. Not trusted, not parsed - it
+    # exists so the operator can match a claim against a bank statement.
+    upi_reference: Mapped[str] = mapped_column(String(255), default="")
+
+    # pending | approved | rejected
+    status: Mapped[str] = mapped_column(String(32), default="pending", nullable=False, index=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reviewed_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    note: Mapped[str] = mapped_column(Text, default="")
+
+    # Why the notification email failed, if it did. The row is the record and
+    # the email is only a nudge, so a failed send must not lose the claim - it
+    # leaves a reason here and the request still appears in the panel.
+    notify_error: Mapped[str] = mapped_column(Text, default="")
+
+
 # Tables carrying a user_id, used by the migration to switch RLS on uniformly
 # rather than by a hand-maintained list that drifts from the models.
 #
@@ -489,6 +556,10 @@ class PushSubscription(Base, TimestampMixin):
 # `user_id = current_setting(...)`, and a pool contact's owner is NULL, so
 # under that predicate the entire shared pool would be invisible to everyone -
 # silently, with no error. It gets its own asymmetric policy in 0008 instead.
+#
+# `payment_requests` is absent for the opposite reason: it carries a `user_id`
+# but must be readable across users by the operator, and no bound session can
+# do that. See the docstring on `PaymentRequest` for what that costs.
 #
 # `dead_addresses`, `recipient_guard` and `worker_heartbeat` are absent because
 # they belong to no user at all.
