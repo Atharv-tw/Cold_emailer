@@ -2,11 +2,12 @@
 
 Revision ID: 0004
 Revises: 0003
+
+Folded into 0001 — google_event_id and event_synced_due_at are created
+with the schedule table. This migration is kept as a no-op to preserve
+the revision chain.
 """
 from __future__ import annotations
-
-from alembic import op
-import sqlalchemy as sa
 
 revision = "0004"
 down_revision = "0003"
@@ -15,16 +16,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "schedule",
-        sa.Column("google_event_id", sa.Text(), nullable=False, server_default=""),
-    )
-    op.add_column(
-        "schedule",
-        sa.Column("event_synced_due_at", sa.DateTime(timezone=True), nullable=True),
-    )
+    pass
 
 
 def downgrade() -> None:
-    op.drop_column("schedule", "event_synced_due_at")
-    op.drop_column("schedule", "google_event_id")
+    pass

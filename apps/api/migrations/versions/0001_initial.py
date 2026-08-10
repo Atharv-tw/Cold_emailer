@@ -222,6 +222,8 @@ def upgrade() -> None:
         sa.Column("due_at", sa.DateTime(timezone=True), nullable=False, index=True),
         sa.Column("state", sa.String(32), nullable=False, server_default="pending", index=True),
         sa.Column("attempts", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("google_event_id", sa.Text(), nullable=False, server_default=""),
+        sa.Column("event_synced_due_at", sa.DateTime(timezone=True)),
         *_timestamps(),
         sa.UniqueConstraint("target_id", "step", name="uq_schedule_target_step"),
         sa.CheckConstraint(f"step >= 1 AND step <= {MAX_TOUCHES}", name="ck_schedule_step_ceiling"),
