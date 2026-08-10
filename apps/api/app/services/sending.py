@@ -21,7 +21,9 @@ from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import func, select
 
-from outreach_core.limits import MAX_TOUCHES, WarmupPolicy, may_schedule_touch
+from outreach_core.limits import (
+    MAX_CYCLES, MAX_TOUCHES, RESET_AFTER, WarmupPolicy, may_schedule_touch, starts_new_cycle,
+)
 from outreach_core.mime import (
     Outgoing,
     SenderIdentity,
@@ -154,9 +156,36 @@ async def send_one(
         status=target.status,
         touches_sent=target.touches_sent,
         verification=(target.verification or {}).get("status"),
+        cycles_used=target.cycles_used,
+        last_cycle_ended_at=target.last_cycle_ended_at,
+        now=now,
     )
     if not decision.allowed:
         return SendOutcome(False, decision.reason)
+
+    # A finished sequence that has served its cooldown starts over here rather
+    # than at the end of the previous one: the decision above is the only place
+    # that knows the cycle is permitted, and rolling the counter anywhere else
+    # would let a target reset without a send ever being allowed.
+    #
+    # Only `touches_sent` moves. `cycles_used` counts sequences *finished*, and
+    # is incremented in `_close_or_advance` - counting starts instead would
+    # allow MAX_CYCLES + 1 sequences, because the first one was never counted.
+    if starts_new_cycle(
+        touches_sent=target.touches_sent,
+        cycles_used=target.cycles_used,
+        last_cycle_ended_at=target.last_cycle_ended_at,
+        now=now,
+    ):
+        target.touches_sent = 0
+        session.add(
+            Event(
+                user_id=user.id,
+                target_id=target.id,
+                type="cycle_started",
+                detail=f"sequence {target.cycles_used + 1} of {MAX_CYCLES}",
+            )
+        )
 
     suppressed = await session.scalar(
         select(Suppression).where(
@@ -321,7 +350,16 @@ async def _close_or_advance(
 
     if target.touches_sent >= MAX_TOUCHES:
         target.status = "completed"
-        target.status_detail = f"all {MAX_TOUCHES} touches sent, no reply"
+        # Stamped here because this is the moment the sequence actually ended,
+        # and the cooldown before it may cycle is measured from it. Without
+        # this the reset has no clock and `may_schedule_touch` refuses.
+        target.last_cycle_ended_at = now
+        target.cycles_used += 1
+        remaining = MAX_CYCLES - target.cycles_used
+        target.status_detail = (
+            f"all {MAX_TOUCHES} touches sent, no reply"
+            + (f" - may resume in {RESET_AFTER.days}d" if remaining > 0 else "")
+        )
         return
 
     next_step = target.touches_sent + 1

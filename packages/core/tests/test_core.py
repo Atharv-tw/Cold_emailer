@@ -24,8 +24,9 @@ from outreach_core.classify import (  # noqa: E402
     dsn_status, is_autoreply, is_bounce, is_permanent_bounce, is_transient_bounce,
 )
 from outreach_core.limits import (  # noqa: E402
-    MAX_TOUCHES, MIN_BUSINESS_DAYS_BETWEEN_TOUCHES, RecipientGuard,
-    WarmupPolicy, may_schedule_touch, recipient_key, remaining_touches,
+    MAX_CYCLES, MAX_TOUCHES, MIN_BUSINESS_DAYS_BETWEEN_TOUCHES, RESET_AFTER,
+    RecipientGuard, WarmupPolicy, may_schedule_touch, recipient_key,
+    remaining_touches, starts_new_cycle,
 )
 from outreach_core.mime import (  # noqa: E402
     Outgoing, SenderIdentity, build_message, extend_references, signature, to_gmail_raw,
@@ -569,6 +570,121 @@ class TestClassify(unittest.TestCase):
 
     def test_classification_is_a_value(self):
         self.assertIsInstance(classify(inbound(body="yes")), Classification)
+
+
+# ------------------------------------------------------------- touch cycles
+
+
+class TestTouchCycles(unittest.TestCase):
+    """A completed sequence may run again after a cooldown, twice in total.
+
+    The two properties worth pinning: the ceiling is a real ceiling however
+    long an account lives, and a cycle can never revive somebody who replied.
+    """
+
+    def setUp(self):
+        self.now = datetime(2026, 6, 1, 12, 0, tzinfo=timezone.utc)
+        self.long_ago = self.now - RESET_AFTER - timedelta(days=1)
+        self.recently = self.now - timedelta(days=2)
+
+    def decide(self, **kwargs):
+        base = dict(status="completed", touches_sent=MAX_TOUCHES, now=self.now)
+        return may_schedule_touch(**{**base, **kwargs})
+
+    def test_a_finished_sequence_is_blocked_during_the_cooldown(self):
+        decision = self.decide(cycles_used=1, last_cycle_ended_at=self.recently)
+        self.assertFalse(decision.allowed)
+        self.assertIn("may resume", decision.reason)
+
+    def test_it_resumes_once_the_cooldown_has_passed(self):
+        self.assertTrue(self.decide(cycles_used=1, last_cycle_ended_at=self.long_ago))
+
+    def test_the_ceiling_holds_however_long_you_wait(self):
+        decision = self.decide(
+            cycles_used=MAX_CYCLES, last_cycle_ended_at=self.now - timedelta(days=3650)
+        )
+        self.assertFalse(decision.allowed)
+        self.assertIn("end of it", decision.reason)
+
+    def test_a_replied_target_never_cycles(self):
+        """The safety property. `TERMINAL_STATUSES` is checked before the cycle
+        branch, so no amount of elapsed time revives someone who answered."""
+        for status in ("replied", "bounced", "opted_out", "suppressed"):
+            decision = self.decide(
+                status=status, cycles_used=0, last_cycle_ended_at=self.long_ago
+            )
+            self.assertFalse(decision.allowed, status)
+            self.assertIn("permanently", decision.reason)
+
+    def test_an_undeliverable_address_never_cycles(self):
+        self.assertFalse(
+            self.decide(
+                verification="undeliverable",
+                cycles_used=0,
+                last_cycle_ended_at=self.long_ago,
+            )
+        )
+
+    def test_without_a_recorded_ending_there_is_no_cooldown_to_measure(self):
+        """Targets that completed before cycles existed have a NULL stamp.
+        Refuse rather than treat the missing value as "long ago"."""
+        self.assertFalse(self.decide(cycles_used=0, last_cycle_ended_at=None))
+
+    def test_a_sequence_in_progress_is_unaffected(self):
+        self.assertTrue(may_schedule_touch(status="active", touches_sent=1))
+
+    def test_starts_new_cycle_agrees_with_the_decision(self):
+        """The two are asked separately - a reset is a write, not just a
+        permission - so they must not be able to disagree."""
+        cases = [
+            (MAX_TOUCHES, 1, self.long_ago, True),
+            (MAX_TOUCHES, 1, self.recently, False),
+            (MAX_TOUCHES, MAX_CYCLES, self.long_ago, False),
+            (1, 0, None, False),
+        ]
+        for touches, cycles, ended, expected in cases:
+            self.assertEqual(
+                starts_new_cycle(
+                    touches_sent=touches,
+                    cycles_used=cycles,
+                    last_cycle_ended_at=ended,
+                    now=self.now,
+                ),
+                expected,
+                f"touches={touches} cycles={cycles}",
+            )
+
+    def test_two_sequences_is_six_emails_not_nine(self):
+        """Walks the whole lifecycle the way the send path drives it, because
+        the off-by-one this guards against only shows up over two full runs."""
+        touches, cycles, ended = 0, 0, None
+        sent = 0
+
+        for _ in range(20):  # far more iterations than should be permitted
+            if not may_schedule_touch(
+                status="completed" if touches >= MAX_TOUCHES else "active",
+                touches_sent=touches,
+                cycles_used=cycles,
+                last_cycle_ended_at=ended,
+                now=self.now,
+            ):
+                break
+            if starts_new_cycle(
+                touches_sent=touches,
+                cycles_used=cycles,
+                last_cycle_ended_at=ended,
+                now=self.now,
+            ):
+                touches = 0
+            touches += 1
+            sent += 1
+            if touches >= MAX_TOUCHES:
+                # `_close_or_advance` counts the run as it finishes.
+                cycles += 1
+                ended = self.long_ago  # cooldown already served, worst case
+
+        self.assertEqual(cycles, MAX_CYCLES)
+        self.assertEqual(sent, MAX_TOUCHES * MAX_CYCLES)
 
 
 # ------------------------------------------------------- hard vs soft bounces
