@@ -2,11 +2,15 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
+import LocalTime from "@/components/LocalTime";
 import { api } from "@/lib/api";
 import type { Ops } from "@/lib/types";
 
-function when(iso: string | null): string {
-  return iso ? new Date(iso).toLocaleString() : "never";
+// Clock times render in the browser - see LocalTime. On the server they would
+// be formatted in UTC, which for an operations page is a good way to
+// misdiagnose a stalled job by five and a half hours.
+function when(iso: string | null) {
+  return iso ? <LocalTime iso={iso} /> : "never";
 }
 
 export default async function OpsPage() {

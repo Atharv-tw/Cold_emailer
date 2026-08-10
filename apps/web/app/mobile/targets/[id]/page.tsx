@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import DraftEditor from "@/components/DraftEditor";
+import LocalTime from "@/components/LocalTime";
 import { api } from "@/lib/api";
 import type { Draft, EmailTemplate, Target, TargetDetail } from "@/lib/types";
 
@@ -71,7 +72,12 @@ export default async function TargetPage({
             <fieldset key={message.step}>
               <legend>
                 Touch {message.step} · {message.status}
-                {message.sent_at && ` · ${new Date(message.sent_at).toLocaleString()}`}
+                {message.sent_at && (
+                  <>
+                    {" · "}
+                    <LocalTime iso={message.sent_at} />
+                  </>
+                )}
               </legend>
               <strong>{message.subject}</strong>
               <pre>{message.body}</pre>
@@ -86,7 +92,7 @@ export default async function TargetPage({
         <ul>
           {detail.timeline.map((entry, index) => (
             <li key={index} className="muted">
-              {new Date(entry.at).toLocaleString()} — {entry.type}
+              <LocalTime iso={entry.at} /> — {entry.type}
               {entry.detail && `: ${entry.detail}`}
             </li>
           ))}

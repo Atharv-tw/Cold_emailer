@@ -1,19 +1,21 @@
 import Link from "next/link";
 
 import Icon from "@/components/Icon";
+import LocalTime from "@/components/LocalTime";
 import PwaSetup from "@/components/PwaSetup";
 import ScheduledStat from "@/components/ScheduledStat";
 import { api } from "@/lib/api";
 import { requireAuth } from "@/lib/auth-guard";
 import type { Dashboard, SentByDay } from "@/lib/types";
 
-function when(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+// A clock time has to be formatted in the browser - see LocalTime. `relative`
+// below is safe on the server because a difference in days is the same number
+// in every timezone.
+const WHEN: Intl.DateTimeFormatOptions = {
+  weekday: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+};
 
 function relative(iso: string | null): string {
   if (!iso) return "never";
@@ -179,7 +181,9 @@ export default async function DashboardPage() {
                   <div className="list-title">{reply.name || "Someone"}</div>
                   <div className="list-desc">{reply.company || "—"}</div>
                 </div>
-                <div style={{ fontSize: "11px", color: "var(--muted)" }}>{when(reply.at)}</div>
+                <div style={{ fontSize: "11px", color: "var(--muted)" }}>
+                  <LocalTime iso={reply.at} options={WHEN} />
+                </div>
               </Link>
             ))}
           </div>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import DraftEditor from "@/components/DraftEditor";
+import LocalTime from "@/components/LocalTime";
 import ThreadPanel from "@/components/ThreadPanel";
 import { api } from "@/lib/api";
 import { requireAuth } from "@/lib/auth-guard";
@@ -102,7 +103,9 @@ export default async function TargetPage({
                     <div className="list-title">{entry.type}</div>
                     {entry.detail && <div className="list-desc">{entry.detail}</div>}
                   </div>
-                  <div style={{ fontSize: "11px", color: "var(--muted)" }}>{new Date(entry.at).toLocaleString()}</div>
+                  <div style={{ fontSize: "11px", color: "var(--muted)" }}>
+                    <LocalTime iso={entry.at} />
+                  </div>
                 </div>
               ))}
             </div>

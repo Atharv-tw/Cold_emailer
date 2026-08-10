@@ -1,19 +1,19 @@
 import Link from "next/link";
 
 import NewEmailButton from "@/components/NewEmailButton";
+import LocalTime from "@/components/LocalTime";
 import { api } from "@/lib/api";
 import { requireAuth } from "@/lib/auth-guard";
 import type { MessageOut } from "@/lib/types";
 
-function when(iso: string | null): string {
-  if (!iso) return "not sent";
-  return new Date(iso).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+// Clock times are formatted in the browser - see LocalTime. Formatting them
+// here would use the server's timezone, which is UTC.
+const WHEN: Intl.DateTimeFormatOptions = {
+  month: "short",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+};
 
 function statusOf(message: MessageOut): {
   label: string;
@@ -87,7 +87,9 @@ export default async function EmailsPage() {
                   </div>
                 </div>
                 <span className={`badge ${tone.tone}`}>{tone.label}</span>
-                <div className="text-right text-xs text-muted">{when(message.sent_at)}</div>
+                <div className="text-right text-xs text-muted">
+                  {message.sent_at ? <LocalTime iso={message.sent_at} options={WHEN} /> : "not sent"}
+                </div>
               </Link>
             );
           })}

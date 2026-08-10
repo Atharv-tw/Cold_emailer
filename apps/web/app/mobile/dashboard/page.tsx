@@ -3,16 +3,17 @@ import { redirect } from "next/navigation";
 
 import { auth, signOut } from "@/auth";
 import PwaSetup from "@/components/PwaSetup";
+import LocalTime from "@/components/LocalTime";
 import { api } from "@/lib/api";
 import type { Dashboard } from "@/lib/types";
 
-function when(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+// Clock times are formatted in the browser - see LocalTime. Formatting them
+// here would use the server's timezone, which is UTC.
+const WHEN: Intl.DateTimeFormatOptions = {
+  weekday: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+};
 
 // The operating panel. Each bucket is a count from the dashboard payload and,
 // where a status maps to it, a link into the filtered people list.
@@ -84,7 +85,7 @@ export default async function DashboardPage() {
                 </Link>{" "}
                 {item.company && <span className="muted">· {item.company}</span>}{" "}
                 <span className="muted">
-                  · touch {item.step} · {when(item.due_at)}
+                  · touch {item.step} · <LocalTime iso={item.due_at} options={WHEN} />
                 </span>{" "}
                 {!item.has_draft && <span className="badge">needs writing</span>}
               </li>
@@ -130,7 +131,7 @@ export default async function DashboardPage() {
           <ul>
             {data.recent.map((entry, index) => (
               <li key={index} className="muted">
-                {when(entry.at)} — {entry.type}
+                <LocalTime iso={entry.at} options={WHEN} /> — {entry.type}
                 {entry.detail && `: ${entry.detail}`}
               </li>
             ))}
