@@ -212,6 +212,27 @@ class ResumeOut(BaseModel):
 # ------------------------------------------------------------------ bulk import
 
 
+class PoolContactOut(BaseModel):
+    """A shared-pool contact as the browse page sees it.
+
+    No `hook` and no `status`: both belong to a user's outreach, not to the
+    person, and a pool row has neither until somebody takes it.
+    """
+
+    id: str
+    name: str
+    email: str
+    role: str
+    company: str
+    company_description: str
+    company_website: str
+    target_type: str
+    company_type: str
+    timezone: str
+    links: dict[str, str]
+    verification: dict[str, Any]
+
+
 class ImportField(BaseModel):
     """One column an uploaded file may feed, named as the form asks it."""
 
@@ -238,6 +259,8 @@ class ImportSummary(BaseModel):
     needs_hook: int
     duplicates: int
     suppressed: int
+    # Hard-bounced for someone on this platform, so not importable by anyone.
+    undeliverable: int = 0
     invalid: int
 
 

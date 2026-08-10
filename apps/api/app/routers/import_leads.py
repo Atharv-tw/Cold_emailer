@@ -27,7 +27,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 from sqlalchemy import select
 
 from ..deps import CurrentUser, Db, SettingsDep
-from ..models import Event, Suppression, Target
+from ..models import DeadAddress, Event, Suppression, Target
 from ..schemas import (
     ImportCommitOut,
     ImportField,
@@ -83,8 +83,13 @@ async def _read(file: UploadFile) -> tuple[list[str], list[dict[str, str]]]:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
 
 
-async def _known_emails(session, user_id) -> tuple[set[str], set[str]]:
-    """The user's existing target addresses and suppressed addresses, normalised."""
+async def _known_emails(session, user_id) -> tuple[set[str], set[str], set[str]]:
+    """Existing target addresses, suppressed addresses, and dead ones.
+
+    The third set is not user-scoped: `dead_addresses` records mailboxes that
+    hard-bounced for anybody here, and there is no sense letting one user
+    import an address another user has already proved does not exist.
+    """
     existing = {
         normalise(email)
         for email in await session.scalars(
@@ -97,7 +102,11 @@ async def _known_emails(session, user_id) -> tuple[set[str], set[str]]:
             select(Suppression.email).where(Suppression.user_id == user_id)
         )
     }
-    return existing, suppressed
+    dead = {
+        normalise(email)
+        for email in await session.scalars(select(DeadAddress.email))
+    }
+    return existing, suppressed, dead
 
 
 def _row_out(row: leads_import.ReviewRow) -> ImportRowOut:
@@ -129,9 +138,13 @@ async def preview(
     headers, rows = await _read(file)
     chosen = _parse_mapping(mapping) or suggest_mapping(headers, leads_import.mappable_fields())
 
-    existing, suppressed = await _known_emails(session, user.id)
+    existing, suppressed, dead = await _known_emails(session, user.id)
     result = leads_import.review(
-        rows, chosen, existing_emails=existing, suppressed_emails=suppressed
+        rows,
+        chosen,
+        existing_emails=existing,
+        suppressed_emails=suppressed,
+        dead_emails=dead,
     )
 
     return ImportPreviewOut(
@@ -155,9 +168,13 @@ async def commit(
     headers, rows = await _read(file)
     chosen = _parse_mapping(mapping) or suggest_mapping(headers, leads_import.mappable_fields())
 
-    existing, suppressed = await _known_emails(session, user.id)
+    existing, suppressed, dead = await _known_emails(session, user.id)
     result = leads_import.review(
-        rows, chosen, existing_emails=existing, suppressed_emails=suppressed
+        rows,
+        chosen,
+        existing_emails=existing,
+        suppressed_emails=suppressed,
+        dead_emails=dead,
     )
 
     importable = [row for row in result.rows if row.importable]
