@@ -46,4 +46,9 @@ venv/
 Thumbs.db
 
 
-secrets.md
+*.md
+!README.md
+!readme.md
+!run.md
+!RUN.md
+startup.json
