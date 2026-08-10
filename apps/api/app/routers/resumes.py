@@ -80,6 +80,7 @@ async def upload_resume(
         # A failed parse must not leave the file sitting in storage: the user
         # was told it would be deleted after reading, and it was not kept.
         storage.delete(key)
+        print(f"GEMINI_UPLOAD_ERROR: {exc!r}", flush=True)
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc)) from exc
 
     row = Resume(
