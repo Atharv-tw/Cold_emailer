@@ -315,6 +315,23 @@ async def timeline(target_id: uuid.UUID, user: CurrentUser, session: Db) -> Targ
         )
     }
 
+    # ...and only steps that actually have something written. A pending row on
+    # its own sends nothing: the worker looks for a draft for that step and
+    # skips the row when there is none. Reporting the row as queued anyway told
+    # the user "this is what goes out" above an empty body, and then nothing
+    # went out. The schedule row is real, but it is a slot, not a message.
+    #
+    # This is why the state is not simply "pending or not": a step is queued
+    # only where the two agree.
+    drafted = set(
+        await session.scalars(
+            select(Message.step).where(
+                Message.target_id == target.id, Message.status == "draft"
+            )
+        )
+    )
+    pending = {step: due for step, due in pending.items() if step in drafted}
+
     messages = [
         ThreadMessage(
             step=message.step,
