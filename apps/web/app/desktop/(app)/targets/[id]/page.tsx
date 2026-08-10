@@ -97,7 +97,7 @@ export default async function TargetPage({
             <h2 style={{ marginBottom: "1.5rem" }}>History</h2>
             <div style={{ display: "flex", flexDirection: "column" }}>
               {detail.timeline.map((entry, index) => (
-                <div key={index} className="list-item">
+                <div key={index} className="dz-list-item">
                   <div className="list-icon" style={{ background: "var(--line)", fontSize: "12px" }}>⏳</div>
                   <div className="list-content">
                     <div className="list-title">{entry.type}</div>

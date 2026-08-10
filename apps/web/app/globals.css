@@ -592,7 +592,7 @@
 
   /* --- lists / tables ------------------------------------------------ */
 
-  .list-item {
+  .dz-list-item {
     display: flex;
     align-items: center;
     gap: 0.9rem;
@@ -601,7 +601,7 @@
     border-radius: var(--radius-md);
     transition: background 0.15s;
   }
-  a.list-item:hover {
+  a.dz-list-item:hover {
     background: var(--paper);
   }
   .list-icon {

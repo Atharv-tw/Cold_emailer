@@ -145,7 +145,7 @@ export default async function DashboardPage() {
           ) : (
             <div className="flex flex-col">
               {recentlyContacted.map((target) => (
-                <Link key={target.id} href={`/targets/${target.id}`} className="list-item">
+                <Link key={target.id} href={`/targets/${target.id}`} className="dz-list-item">
                   <div className="list-icon">
                     {(target.name || target.email).charAt(0).toUpperCase()}
                   </div>
@@ -173,7 +173,7 @@ export default async function DashboardPage() {
         ) : (
           <div className="flex flex-col">
             {data.replies.map((reply) => (
-              <Link key={`${reply.target_id}-${reply.at}`} href={`/targets/${reply.target_id}`} className="list-item">
+              <Link key={`${reply.target_id}-${reply.at}`} href={`/targets/${reply.target_id}`} className="dz-list-item">
                 <div className="list-icon">
                   <Icon name="mail" size={16} />
                 </div>
