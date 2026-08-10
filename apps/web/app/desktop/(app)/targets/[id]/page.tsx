@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import DraftEditor from "@/components/DraftEditor";
+import Icon from "@/components/Icon";
 import LocalTime from "@/components/LocalTime";
 import ThreadPanel from "@/components/ThreadPanel";
 import { api } from "@/lib/api";
@@ -12,6 +13,14 @@ const VERIFICATION_TONE: Record<string, string> = {
   risky: "badge-pending",
   undeliverable: "badge-danger",
   unknown: "badge-pending",
+};
+
+const getTimelineIcon = (type: string): any => {
+  if (type.includes("sent")) return "send";
+  if (type.includes("cancel") || type.includes("fail")) return "x";
+  if (type.includes("queue")) return "clock";
+  if (type.includes("created")) return "sparkle";
+  return "info";
 };
 
 export default async function TargetPage({
@@ -98,7 +107,9 @@ export default async function TargetPage({
             <div style={{ display: "flex", flexDirection: "column" }}>
               {detail.timeline.map((entry, index) => (
                 <div key={index} className="dz-list-item">
-                  <div className="list-icon" style={{ background: "var(--line)", fontSize: "12px" }}>⏳</div>
+                  <div className="list-icon" style={{ background: "var(--line)", color: "var(--fg)" }}>
+                    <Icon name={getTimelineIcon(entry.type)} size={16} />
+                  </div>
                   <div className="list-content">
                     <div className="list-title">{entry.type}</div>
                     {entry.detail && <div className="list-desc">{entry.detail}</div>}
