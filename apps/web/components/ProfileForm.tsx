@@ -523,57 +523,6 @@ export default function ProfileForm({ profile, disclosure, user }: Props) {
             <p className="text-[11.5px]">Falls back to your Google picture if you don&rsquo;t upload one.</p>
           </section>
 
-          {/* Completeness, as a thing you can see rather than a percentage in
-              a sentence. The list below it is the actual to-do. */}
-          <section className="dz-card gap-3">
-            <div className="flex items-center gap-3">
-              <div className="relative h-16 w-16 shrink-0">
-                <svg viewBox="0 0 64 64" className="h-16 w-16 -rotate-90">
-                  <circle cx="32" cy="32" r="26" fill="none" stroke="var(--line)" strokeWidth="7" />
-                  <circle
-                    cx="32"
-                    cy="32"
-                    r="26"
-                    fill="none"
-                    stroke={meter.complete ? "var(--lime)" : "var(--ink)"}
-                    strokeWidth="7"
-                    strokeLinecap="round"
-                    strokeDasharray={`${(ring * meter.score) / 100} ${ring}`}
-                  />
-                </svg>
-                <span
-                  className="absolute inset-0 flex items-center justify-center text-[15px] font-bold"
-                  style={{ fontFamily: "var(--font-display)", letterSpacing: "-0.03em" }}
-                >
-                  {meter.score}%
-                </span>
-              </div>
-              <div>
-                <div className="card-title">{meter.complete ? "Ready to send" : "Profile incomplete"}</div>
-                <p className="text-[12.5px]">
-                  {meter.complete
-                    ? "Everything an email needs is here."
-                    : "You cannot add targets until this is filled in."}
-                </p>
-              </div>
-            </div>
-
-            {!meter.complete && (
-              <ul className="flex flex-col gap-1.5 text-[12.5px] text-muted">
-                {meter.prompts.map((prompt) => (
-                  <li key={prompt} className="flex gap-2">
-                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-lime-dark" />
-                    {prompt}
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            <p className="text-[11.5px]">
-              Missing: {meter.missing.map((key) => FIELD_LABELS[key] ?? key).join(", ") || "nothing"}
-            </p>
-          </section>
-
           {/* The shortcut. One line of disclosure, the rest behind the ⓘ. */}
           <section className="dz-card dz-card-dark gap-3">
             <div className="flex items-start justify-between gap-2">
@@ -657,6 +606,57 @@ export default function ProfileForm({ profile, disclosure, user }: Props) {
 
             <p className="text-[11.5px] text-white/50">
               No resume? Everything on the right can be typed in by hand.
+            </p>
+          </section>
+
+          {/* Completeness, as a thing you can see rather than a percentage in
+              a sentence. The list below it is the actual to-do. */}
+          <section className="dz-card gap-3">
+            <div className="flex items-center gap-3">
+              <div className="relative h-16 w-16 shrink-0">
+                <svg viewBox="0 0 64 64" className="h-16 w-16 -rotate-90">
+                  <circle cx="32" cy="32" r="26" fill="none" stroke="var(--line)" strokeWidth="7" />
+                  <circle
+                    cx="32"
+                    cy="32"
+                    r="26"
+                    fill="none"
+                    stroke={meter.complete ? "var(--lime)" : "var(--ink)"}
+                    strokeWidth="7"
+                    strokeLinecap="round"
+                    strokeDasharray={`${(ring * meter.score) / 100} ${ring}`}
+                  />
+                </svg>
+                <span
+                  className="absolute inset-0 flex items-center justify-center text-[15px] font-bold"
+                  style={{ fontFamily: "var(--font-display)", letterSpacing: "-0.03em" }}
+                >
+                  {meter.score}%
+                </span>
+              </div>
+              <div>
+                <div className="card-title">{meter.complete ? "Ready to send" : "Profile incomplete"}</div>
+                <p className="text-[12.5px]">
+                  {meter.complete
+                    ? "Everything an email needs is here."
+                    : "You cannot add targets until this is filled in."}
+                </p>
+              </div>
+            </div>
+
+            {!meter.complete && (
+              <ul className="flex flex-col gap-1.5 text-[12.5px] text-muted">
+                {meter.prompts.map((prompt) => (
+                  <li key={prompt} className="flex gap-2">
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-lime-dark" />
+                    {prompt}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <p className="text-[11.5px]">
+              Missing: {meter.missing.map((key) => FIELD_LABELS[key] ?? key).join(", ") || "nothing"}
             </p>
           </section>
         </aside>
