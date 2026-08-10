@@ -64,9 +64,61 @@ export type SessionUser = {
   missing_scopes: string[];
   profile_complete: boolean;
   calendar_connected: boolean;
+  // Optional so an older API response still typechecks; both default to false
+  // server-side, and false is the safe reading of "absent" for an entitlement
+  // and a role alike.
+  is_paid?: boolean;
+  is_admin?: boolean;
 };
 
 export type AvatarOut = { avatar_url: string };
+
+export type Billing = {
+  // False when the deployment has no UPI id, price or object storage set.
+  available: boolean;
+  price_inr: number;
+  upi_id: string;
+  payee_name: string;
+  // "" when this account has never claimed.
+  request_status: "" | "pending" | "approved" | "rejected";
+  requested_at: string | null;
+  is_paid: boolean;
+};
+
+export type PaymentRequestOut = {
+  id: string;
+  status: string;
+  created_at: string;
+};
+
+export type AdminUserRow = {
+  id: string;
+  email: string;
+  name: string;
+  joined_at: string;
+  is_paid: boolean;
+  is_admin: boolean;
+  connected: boolean;
+};
+
+export type AdminUserDetail = AdminUserRow & {
+  targets: number;
+  sent: number;
+  last_sent_at: string | null;
+};
+
+export type AdminPayment = {
+  id: string;
+  user_id: string;
+  user_email: string;
+  user_name: string;
+  upi_reference: string;
+  status: string;
+  created_at: string;
+  reviewed_at: string | null;
+  note: string;
+  notify_error: string;
+};
 
 export type Verification = {
   status?: "deliverable" | "risky" | "undeliverable" | "unknown";

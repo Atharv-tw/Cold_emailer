@@ -56,6 +56,29 @@ function describe(detail: unknown): string | undefined {
   return lines.join("; ") || undefined;
 }
 
+/**
+ * The raw response, with the bearer token attached and nothing interpreted.
+ *
+ * `api()` treats any non-2xx as an error and parses the body as JSON, which is
+ * right almost everywhere. It is wrong when the status *is* the answer - a 302
+ * carrying a `Location` to follow, say - so this returns the response
+ * untouched and leaves the caller to decide what it means.
+ */
+export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const token = await apiToken();
+  const isMultipart = init.body instanceof FormData;
+
+  return fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: {
+      ...(isMultipart ? {} : { "Content-Type": "application/json" }),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...init.headers,
+    },
+    cache: "no-store",
+  });
+}
+
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = await apiToken();
 

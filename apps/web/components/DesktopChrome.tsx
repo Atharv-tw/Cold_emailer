@@ -37,6 +37,36 @@ function NavLink({ href, icon, label, active }: { href: string; icon: IconName; 
 }
 
 /**
+ * The pool upsell, shown only to accounts that have not bought it.
+ *
+ * Lives in the rail rather than on one page because the moment somebody wants
+ * a list of founders is not predictable - it is whenever they run out of
+ * people to write to. Once bought it disappears: a permanent advertisement
+ * aimed at existing customers is just clutter in a 68px column.
+ *
+ * The rail collapses to icons, so this has to read at both widths - the icon
+ * carries it alone when collapsed, and `rail-label` supplies the pitch only
+ * once there is room for it.
+ */
+function PoolUpsell() {
+  return (
+    <Link href="/pool" className="rail-link mt-2" title="Get the contact pool">
+      <span className="rail-icon" style={{ color: "var(--lime)" }}>
+        <Icon name="sparkle" size={19} strokeWidth={1.8} />
+      </span>
+      <span className="rail-label">
+        <span className="block text-[13px] font-semibold leading-tight text-white">
+          Contact pool
+        </span>
+        <span className="block text-[11px] leading-tight text-white/60">
+          500 founders, ready to write to
+        </span>
+      </span>
+    </Link>
+  );
+}
+
+/**
  * Sidebar + topbar shell for every authenticated desktop page.
  *
  * The rail floats - inset from every edge, rounded, shadowed - rather than
@@ -89,9 +119,21 @@ export default function DesktopChrome({
               active={pathname === item.href || pathname.startsWith(item.href + "/")}
             />
           ))}
+          {!user.is_paid && <PoolUpsell />}
         </nav>
 
         <div className="mt-auto flex flex-col gap-1">
+          {/* Only operators see it, and only operators can use it - the API
+              refuses every /v1/admin route without the role regardless of
+              what the rail renders. */}
+          {user.is_admin && (
+            <NavLink
+              href="/admin"
+              icon="briefcase"
+              label="Admin"
+              active={pathname === "/admin" || pathname.startsWith("/admin/")}
+            />
+          )}
           {GENERAL_ITEMS.map((item) => (
             <NavLink key={item.href} {...item} active={pathname === item.href} />
           ))}

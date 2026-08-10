@@ -18,6 +18,35 @@ import { savePushSubscription } from "@/app/desktop/(app)/dashboard/actions";
 
 type InstallEvent = Event & { prompt: () => Promise<void> };
 
+/**
+ * Whether this is iOS and the site is not already installed.
+ *
+ * Safari has never implemented `beforeinstallprompt`, so the install button
+ * below is unreachable there and iOS users were shown nothing at all - the one
+ * platform where installing actually changes something, since web push only
+ * works from the home screen. There is no API to trigger it, so the only
+ * honest option is to describe the manual steps.
+ *
+ * iPadOS 13 and later report a Macintosh user agent, which is why touch points
+ * are checked too - a real Mac reports 0.
+ */
+function isUninstalledIos(): boolean {
+  if (typeof window === "undefined") return false;
+
+  const ua = navigator.userAgent;
+  const iphone = /iP(hone|od|ad)/.test(ua);
+  const ipad = /Macintosh/.test(ua) && navigator.maxTouchPoints > 1;
+  if (!iphone && !ipad) return false;
+
+  // `navigator.standalone` is the iOS-only signal for "launched from the home
+  // screen"; the media query covers installed PWAs generally.
+  const standalone =
+    (navigator as Navigator & { standalone?: boolean }).standalone === true ||
+    window.matchMedia("(display-mode: standalone)").matches;
+
+  return !standalone;
+}
+
 function toUint8Array(base64: string): Uint8Array<ArrayBuffer> {
   const padded = (base64 + "=".repeat((4 - (base64.length % 4)) % 4))
     .replace(/-/g, "+")
@@ -35,9 +64,14 @@ function toUint8Array(base64: string): Uint8Array<ArrayBuffer> {
 
 export default function PwaSetup({ vapidKey }: { vapidKey: string }) {
   const [installEvent, setInstallEvent] = useState<InstallEvent | null>(null);
+  const [iosInstall, setIosInstall] = useState(false);
   const [pushState, setPushState] = useState<"unknown" | "on" | "off" | "denied">("unknown");
 
   useEffect(() => {
+    // Set in an effect, not during render: it reads `navigator`, and the
+    // server has no opinion about what device this is.
+    setIosInstall(isUninstalledIos());
+
     if (!("serviceWorker" in navigator)) return;
     navigator.serviceWorker.register("/sw.js").catch(() => {
       // Registration fails on http:// origins other than localhost. Nothing
@@ -82,10 +116,20 @@ export default function PwaSetup({ vapidKey }: { vapidKey: string }) {
     setPushState("on");
   }
 
-  if (!installEvent && pushState !== "off" && pushState !== "denied") return null;
+  if (!installEvent && !iosInstall && pushState !== "off" && pushState !== "denied") return null;
 
   return (
     <div className="note">
+      {iosInstall && (
+        <p>
+          <span className="muted">
+            To install this: tap the Share button, then <strong>Add to Home Screen</strong>.
+            It gets its own icon and window, and it is the only way reminders can reach
+            you on an iPhone.
+          </span>
+        </p>
+      )}
+
       {installEvent && (
         <p>
           <button
