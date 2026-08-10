@@ -1,0 +1,106 @@
+# Production stack for the VM. Postgres, Redis, the API and the arq worker;
+# the web app stays on Vercel.
+#
+#   docker compose -f infra/docker-compose.prod.yml up -d --build
+#
+# Distinct project name so this cannot collide with the other compose stacks
+# on this box (Shipping_software_X, the urban-seva bot).
+name: outreach
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: outreach
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: outreach
+    # Deliberately no published port. docker-compose.yml (the dev one) maps
+    # 5432 with the password "outreach", which is fine on a laptop and would
+    # put an open Postgres on the office LAN here.
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # The first migration creates RLS policies, so the API must not start
+      # against a half-initialised server.
+      test: ["CMD-SHELL", "pg_isready -U outreach -d outreach"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.api
+    env_file: ../.env
+    # Loopback only. cloudflared runs as a host systemd unit rather than a
+    # container, so it cannot resolve Docker service names and needs a real
+    # host port - but binding 127.0.0.1 keeps that port off the office LAN.
+    # Check `ss -tlnp` before changing 18000; this box is shared.
+    ports:
+      - "127.0.0.1:18000:8000"
+    volumes:
+      # Resumes land here before parsing, and survive if the user kept the
+      # original. A named volume so a rebuild does not drop them.
+      - storage:/app/apps/api/var/storage
+    healthcheck:
+      # /readyz answers 200 even when it is not ready and reports the failure in
+      # the body, so the status code alone would call a broken .env healthy.
+      # Read the "ready" flag instead.
+      test: ["CMD", "python", "-c",
+             "import json,sys,urllib.request; sys.exit(0 if json.load(urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=3))['ready'] else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.api
+    env_file: ../.env
+    environment:
+      # arq crons fire on the process's local clock, and renew_watches
+      # (hour=3) and notify_due (hour=8) are written as human hours. Inherit
+      # UTC and the "due today" push lands mid-afternoon.
+      TZ: Asia/Kolkata
+      # The worker never runs Alembic, and this URL is the schema owner - a
+      # role that bypasses RLS outright. settings.alembic_url falls back to
+      # database_url when it is empty (settings.py:49), so blanking is safe.
+      MIGRATION_DATABASE_URL: ""
+    command: ["arq", "app.worker.WorkerSettings"]
+    # Exactly one, always. MAX_SENDS_PER_TICK is a per-process cap, so a
+    # second worker silently doubles the send rate past a limiter that was
+    # never consulted about it. Before starting this, confirm the systemd
+    # outreach-worker unit on the host is stopped and disabled.
+    deploy:
+      replicas: 1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  storage:

@@ -1,0 +1,31 @@
+# Reference snippet - NOT read from the repo.
+#
+# The live file is the host's cloudflared config, normally
+# /etc/cloudflared/config.yml. Merge the rule below into the existing
+# `ingress:` list, keeping the mytrackers.in rules that are already there.
+# Back that file up first: the tunnel's other routes run through it.
+#
+# Two things about ordering and DNS:
+#
+#   1. Rules match top to bottom and the catch-all MUST stay last. A rule
+#      placed after `service: http_status:404` is dead.
+#   2. The hostname needs a CNAME to the tunnel before it resolves:
+#
+#        cloudflared tunnel route dns <tunnel-name> outreach-api.mytrackers.in
+#
+# Then:  sudo systemctl restart cloudflared
+#        journalctl -u cloudflared -n 50 --no-pager
+#
+# 127.0.0.1:18000 is where the API container publishes. cloudflared runs as a
+# host systemd unit rather than a container, so it cannot resolve Docker
+# service names and needs a real host port - and binding that port to loopback
+# keeps it off the office LAN.
+
+ingress:
+  # ... existing mytrackers.in rules stay here ...
+
+  - hostname: outreach-api.mytrackers.in
+    service: http://127.0.0.1:18000
+
+  # Catch-all. Must be the final entry.
+  - service: http_status:404

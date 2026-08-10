@@ -1,0 +1,24 @@
+# The build context is the repo root (both services build from infra/), so
+# everything the API image does not need is excluded here.
+
+.git
+.venv
+**/__pycache__
+**/*.pyc
+
+# The web app is on Vercel and is not part of this image.
+apps/web
+
+# Secrets are injected at runtime via compose env_file, never baked in.
+.env
+env.ps1
+secrets.md
+
+# Local SQLite scratch databases from the single-user CLI era.
+*.db
+
+# Test fixtures and local data
+alfonso.csv
+leads.csv
+startup.json
+apps/api/var
