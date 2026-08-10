@@ -17,6 +17,7 @@
 set -euo pipefail
 
 COMPOSE_FILE="${COMPOSE_FILE:-/home/admin1/projects/email/infra/docker-compose.prod.yml}"
+ENV_FILE="${ENV_FILE:-/home/admin1/projects/email/.env}"
 DEST="${BACKUP_DIR:-/home/admin1/backups/email}"
 KEEP_DAYS="${KEEP_DAYS:-14}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
@@ -26,7 +27,7 @@ mkdir -p "$DEST"
 
 # -T because cron has no TTY. Custom format so pg_restore can do selective
 # restores and parallel loads.
-docker compose -f "$COMPOSE_FILE" exec -T postgres \
+docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T postgres \
     pg_dump -U outreach -d outreach --format=custom > "$OUT"
 
 # A zero-byte file means pg_dump failed after the shell already created the
