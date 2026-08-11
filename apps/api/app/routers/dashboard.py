@@ -17,7 +17,7 @@ from sqlalchemy import func, select
 from outreach_core.limits import MAX_TOUCHES
 
 from ..deps import CurrentUser, Db
-from ..models import Event, Message, ScheduleRow, Suppression, Target
+from ..models import Event, Message, ScheduleRow, Suppression, Target, TargetReply
 
 router = APIRouter(prefix="/v1", tags=["dashboard"])
 
@@ -59,6 +59,9 @@ class ReplyItem(BaseModel):
     name: str
     company: str
     at: datetime
+    # Whether the user has opened it yet. No body here on purpose - the tracker
+    # is a list of who answered, and the words live one click away.
+    unread: bool = False
 
 
 class DashboardOut(BaseModel):
@@ -239,28 +242,59 @@ async def dashboard(user: CurrentUser, session: Db) -> DashboardOut:
         )
     ]
 
-    reply_events = list(
-        await session.scalars(
-            select(Event)
+    # One query, not eleven. This read the ten latest reply events and then
+    # issued a `session.get(Target, ...)` per event, which also meant an event
+    # whose target had been deleted was silently dropped and the list came back
+    # short of the ten it promised. Joining states that intent instead.
+    reply_rows = (
+        await session.execute(
+            select(
+                Event.at,
+                Target.id,
+                Target.name,
+                Target.company,
+                TargetReply.read_at,
+                # Distinguishes "stored and unread" from "no stored reply at
+                # all"; both leave `read_at` NULL under the outer join.
+                TargetReply.created_at,
+            )
+            .join(Target, Target.id == Event.target_id)
+            .outerjoin(TargetReply, TargetReply.target_id == Target.id)
             .where(Event.user_id == user.id, Event.type == "replied")
             .order_by(Event.at.desc())
             .limit(10)
         )
-    )
-    replies: list[ReplyItem] = []
-    for event in reply_events:
-        if event.target_id is None:
-            continue
-        target = await session.get(Target, event.target_id)
-        if target is None:
-            continue
-        replies.append(
-            ReplyItem(target_id=str(target.id), name=target.name, company=target.company, at=event.at)
+    ).all()
+    replies = [
+        ReplyItem(
+            target_id=str(target_id),
+            name=name,
+            company=company,
+            at=at,
+            # An outer join, because a reply that predates `target_replies`
+            # existing has an event and no stored body. Treated as read: there
+            # is nothing to open, so marking it unread would be an alert the
+            # user can never clear.
+            unread=read_at is None and stored_at is not None,
         )
+        for at, target_id, name, company, read_at, stored_at in reply_rows
+    ]
+
+    # Backed by the partial index on `read_at IS NULL`, so this stays a count
+    # of the unread rows rather than a scan of every reply ever received.
+    unread_replies = int(
+        await session.scalar(
+            select(func.count(TargetReply.target_id)).where(
+                TargetReply.user_id == user.id, TargetReply.read_at.is_(None)
+            )
+        )
+        or 0
+    )
 
     return DashboardOut(
         counts={
             "sent": sent_total,
+            "unread_replies": unread_replies,
             "replied": status_counts.get("replied", 0),
             "bounced": status_counts.get("bounced", 0),
             "opted_out": status_counts.get("opted_out", 0),
