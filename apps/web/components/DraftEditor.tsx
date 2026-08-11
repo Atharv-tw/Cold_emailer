@@ -12,6 +12,7 @@ import {
 } from "@/app/desktop/(app)/dashboard/actions";
 import { ErrorModal, InlineError } from "@/components/ActionError";
 import QueuedNotice from "@/components/QueuedNotice";
+import Working from "@/components/Working";
 import type { ActionError, Result } from "@/lib/result";
 import { useGeminiKey } from "@/lib/useGeminiKey";
 import type { Draft, EmailTemplate, Target } from "@/lib/types";
@@ -71,6 +72,9 @@ export default function DraftEditor({
   const [instruction, setInstruction] = useState("");
   const [templateKey, setTemplateKey] = useState(templates[0]?.key ?? "specific_hook");
   const [status, setStatus] = useState("");
+  // Separate from `pending`, which every button on this screen shares. Only
+  // the one you pressed should look like it is doing something.
+  const [writing, setWriting] = useState(false);
   const [error, setError] = useState<ActionError | null>(null);
   const [pending, startTransition] = useTransition();
   const { key: geminiKey, hasKey: hasGeminiKey } = useGeminiKey();
@@ -159,20 +163,36 @@ export default function DraftEditor({
           title={hasGeminiKey ? undefined : "Add your Gemini API key in Settings first"}
           onClick={() =>
             run(async () => {
-              setStatus("Writing…");
-              const draft = need(
-                await generateDraft(target.id, instruction, templateKey, geminiKey),
-              );
-              setSubject(draft.subject);
-              setBody(draft.body);
-              setSaved({ subject: draft.subject, body: draft.body });
-              setWarnings(draft.warnings);
-              setStatus("Written. Read it before you send it.");
+              setStatus("");
+              setWriting(true);
+              try {
+                const draft = need(
+                  await generateDraft(target.id, instruction, templateKey, geminiKey),
+                );
+                setSubject(draft.subject);
+                setBody(draft.body);
+                setSaved({ subject: draft.subject, body: draft.body });
+                setWarnings(draft.warnings);
+                setStatus("Written. Read it before you send it.");
+              } finally {
+                setWriting(false);
+              }
             })
           }
         >
-          {initial ? "Write it again" : "Write it for me"}
+          {writing ? "Writing…" : initial ? "Write it again" : "Write it for me"}
         </button>
+        {writing && (
+          <Working
+            label={initial ? "Rewriting" : "Writing"}
+            hints={[
+              "reading your profile and their details",
+              "picking the project that fits them",
+              "drafting the three paragraphs",
+              "still going — Gemini can take a few seconds",
+            ]}
+          />
+        )}
         {!hasGeminiKey && (
           <p className="muted" style={{ fontSize: "12px", marginTop: "0.25rem" }}>
             Add your Gemini API key in Settings to write drafts automatically.
