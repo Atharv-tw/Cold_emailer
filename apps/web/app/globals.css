@@ -451,7 +451,7 @@
     transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .rail:hover {
-    width: 232px;
+    width: 250px;
   }
   .rail-link {
     display: flex;
@@ -492,6 +492,23 @@
   }
   .rail:hover .rail-label {
     opacity: 1;
+  }
+
+  /* The upsell is the one rail item carrying a sentence rather than a word,
+     and it does not fit the 232px hover width on one line - `rail-link` keeps
+     everything else on one line, so the pitch has to opt out of that and wrap.
+     The box it wraps inside is a fixed width, not a fluid one: a width that
+     tracked the rail would re-wrap on every frame of the open animation. */
+  .rail-upsell {
+    align-items: flex-start;
+  }
+  .rail-upsell .rail-icon {
+    margin-top: 2px;
+  }
+  .rail-upsell .rail-label {
+    width: 170px;
+    flex-shrink: 0;
+    white-space: normal;
   }
 
   /* --- cards --------------------------------------------------------- */

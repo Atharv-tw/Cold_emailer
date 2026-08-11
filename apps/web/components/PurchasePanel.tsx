@@ -74,7 +74,12 @@ export default function PurchasePanel({ billing }: { billing: Billing }) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    // Two steps, so two columns once there is room for them: pay on the left,
+    // prove it on the right. They stack below `lg` because the QR needs its
+    // 196px and the form needs room to type in, and neither survives being
+    // squeezed into half a phone. `items-start` keeps the short QR card its own
+    // height instead of stretching it to match the taller form.
+    <div className="grid items-start gap-4 md:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
       <div className="dz-card items-center gap-3 text-center">
         <h3>Pay ₹{billing.price_inr}</h3>
         <div className="rounded-2xl bg-white p-4">
