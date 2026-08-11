@@ -32,7 +32,10 @@ export default async function PoolPage({
     return (
       <div className="flex flex-col gap-6 pt-2">
         <h1 className="text-2xl font-bold" style={{ fontFamily: "var(--font-display)" }}>Contact pool</h1>
-        <PoolLocked status={billing?.request_status ?? ""} />
+        <PoolLocked
+          status={billing?.request_status ?? ""}
+          priceInr={billing?.price_inr}
+        />
       </div>
     );
   }

@@ -1204,6 +1204,15 @@
     box-shadow: 0 8px 20px -8px rgba(198, 239, 78, 0.8);
   }
 
+  /* The price is the one number on this card worth reading from across the
+     room, so it gets the badge at a size the word it replaced could not use. */
+  .pool-gate-sticker-price {
+    width: 4.75rem;
+    height: 4.75rem;
+    font-size: 22px;
+    letter-spacing: -0.02em;
+  }
+
   .pool-gate-copy {
     display: flex;
     flex-direction: column;

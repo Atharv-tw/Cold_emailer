@@ -44,7 +44,10 @@ export default async function PoolPage({
             <p>A shared list of founders and hiring leads</p>
           </div>
         </div>
-        <PoolLocked status={billing?.request_status ?? ""} />
+        <PoolLocked
+          status={billing?.request_status ?? ""}
+          priceInr={billing?.price_inr}
+        />
       </>
     );
   }

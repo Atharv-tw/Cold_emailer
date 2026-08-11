@@ -18,8 +18,14 @@ import Link from "next/link";
  */
 export default function PoolLocked({
   status,
+  priceInr,
 }: {
   status: "" | "pending" | "approved" | "rejected";
+  // From `/v1/billing`, the same field the UPI QR is built from, so the number
+  // on the badge cannot drift away from the amount somebody is actually asked
+  // to pay. Absent when that call failed - the page still has to render, so
+  // the price simply goes unsaid rather than being guessed at.
+  priceInr?: number | null;
 }) {
   if (status === "pending") {
     return (
@@ -52,7 +58,11 @@ export default function PoolLocked({
       <div className="pool-gate-inner">
         <div className="pool-gate-art">
           <img src="/image.png" alt="" />
-          <span className="pool-gate-sticker">PAY UP</span>
+          {/* The bigger badge is for the number only - "PAY UP" at that size
+              does not fit the circle. */}
+          <span className={`pool-gate-sticker${priceInr ? " pool-gate-sticker-price" : ""}`}>
+            {priceInr ? `₹${priceInr}` : "PAY UP"}
+          </span>
         </div>
 
         <div className="pool-gate-copy">
@@ -80,7 +90,9 @@ export default function PoolLocked({
           )}
 
           <Link href="/pool/purchase">
-            <button className="pool-gate-cta">Get access →</button>
+            <button className="pool-gate-cta">
+              {priceInr ? `Get access for ₹${priceInr} →` : "Get access →"}
+            </button>
           </Link>
 
           <p className="pool-gate-fine">
