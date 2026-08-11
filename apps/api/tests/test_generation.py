@@ -20,7 +20,8 @@ from app.services.generation import (  # noqa: E402
     build_prompt, ranked_projects, recipient_block, sender_block, split_subject,
 )
 from app.services.playbooks import (  # noqa: E402
-    FOLLOW_UP_RULES, LAST_TOUCH_RULES, TARGET_PLAYBOOKS, playbook_for, touch_rules,
+    FIRST_TOUCH_RULES, FOLLOW_UP_RULES, LAST_TOUCH_RULES, TARGET_PLAYBOOKS,
+    playbook_for, touch_rules,
 )
 
 
@@ -168,9 +169,32 @@ class TestPromptRules(unittest.TestCase):
         self.assertEqual(ranked[0].name, "inference")
 
 
+class TestFirstEmailShape(unittest.TestCase):
+    def test_the_first_email_asks_for_three_paragraphs(self):
+        text = prompt(step=1)
+        self.assertIn("exactly three paragraphs", text)
+        for role in ("1. Intro", "2. The work", "3. The ask"):
+            self.assertIn(role, text, role)
+
+    def test_the_shape_does_not_leak_into_follow_ups(self):
+        # A follow-up is two or three sentences; three paragraphs would be
+        # the pitch all over again, which is what nobody replies to.
+        for step in (2, 3):
+            text = prompt(step=step, thread=[("Subject", "Body")])
+            self.assertNotIn("exactly three paragraphs", text)
+            self.assertIn("does not apply", text)
+
+    def test_templates_steer_within_the_shape_rather_than_replacing_it(self):
+        for key in ("specific_hook", "project_fit", "recruiter_scan", "research_interest"):
+            text = prompt(template_key=key)
+            self.assertIn("three paragraphs", text, key)
+            self.assertNotIn("Structure:", text, key)
+
+
 class TestFollowUps(unittest.TestCase):
     def test_first_touch_says_they_have_never_heard_from_you(self):
         self.assertIn("never heard from you", touch_rules(1, 3))
+        self.assertEqual(touch_rules(1, 3), FIRST_TOUCH_RULES)
 
     def test_middle_touch_gets_the_follow_up_rules(self):
         self.assertEqual(touch_rules(2, 3), FOLLOW_UP_RULES)
