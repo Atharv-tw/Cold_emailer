@@ -428,6 +428,45 @@ class TestMime(unittest.TestCase):
 
         self.assertIn(b"Subject: Hi", base64.urlsafe_b64decode(raw))
 
+    def test_every_body_shape_survives_the_no_wrap_policy(self):
+        """The send policy disables wrapping; it must not disable encoding.
+
+        A `max_line_length` under 4 reaches `quoprimime.body_encode` through
+        `set_content` and raises, which took down every send until the limit
+        became 998 instead of 0. One case per encoding branch - plain ASCII,
+        non-ASCII, and a line past the RFC 5322 limit - each checked by
+        reading the body back out of the serialized message.
+        """
+        import email as email_mod
+        from email.policy import default as default_policy
+
+        bodies = {
+            "ascii": "Hi Dana,\n\nQuick note about ExampleCorp.\n\nAtharv",
+            "non_ascii": "Hi Dana — I read your post. It’s good.\n\nAtharv",
+            "long_line": "word " * 400,
+        }
+        for label, body in bodies.items():
+            with self.subTest(body=label):
+                msg = build_message(self.sender, Outgoing("d@e.com", "Hi", body))
+                raw = msg.as_bytes()
+                parsed = email_mod.message_from_bytes(raw, policy=default_policy)
+                self.assertEqual(parsed.get_content().rstrip("\n"), body.rstrip("\n"))
+                # 998 is a hard limit, not a preference - Gmail may accept a
+                # longer line, but the next hop is not required to.
+                self.assertLessEqual(max(len(line) for line in raw.split(b"\n")), 998)
+
+    def test_headers_are_not_folded(self):
+        """Long subjects and References chains go out on one line."""
+        subject = "Hi Dana - about the ExampleCorp platform role you posted last week"
+        references = " ".join(f"<gmail-{n}@mail.gmail.com>" for n in range(8))
+        msg = build_message(
+            self.sender,
+            Outgoing("d@e.com", subject, "Body", in_reply_to="<x@mail.gmail.com>", references=references),
+        )
+        raw = msg.as_bytes()
+        self.assertIn(f"Subject: {subject}".encode(), raw)
+        self.assertIn(f"{references} <x@mail.gmail.com>".encode(), raw)
+
 
 class TestSignature(unittest.TestCase):
     def test_nothing_configured_appends_nothing(self):

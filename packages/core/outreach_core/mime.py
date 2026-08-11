@@ -130,7 +130,12 @@ def build_message(
     the next touch. Setting one here and trusting it would break threading the
     moment Gmail rewrote it.
     """
-    msg = EmailMessage(policy=default_policy.clone(max_line_length=0))
+    # 998, not 0. Both mean "don't wrap" for anything this sends - 998 is the
+    # RFC 5322 hard limit on a line, which no subject, References chain or
+    # typed paragraph reaches - but 0 is a trap: `set_content` feeds
+    # `max_line_length` straight to `quoprimime.body_encode`, which rejects
+    # anything under 4, so every non-empty body raised ValueError.
+    msg = EmailMessage(policy=default_policy.clone(max_line_length=998))
     msg["From"] = formataddr((sender.from_name, sender.email))
     msg["To"] = out.to_email
     msg["Subject"] = out.subject
