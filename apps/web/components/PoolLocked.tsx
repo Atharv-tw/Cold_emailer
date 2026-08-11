@@ -62,7 +62,7 @@ export default function PoolLocked({
           </h2>
           <p className="pool-gate-lede">
             Around 500 founders, co-founders and hiring leads at Indian startups — with
-            the company, the role and a LinkedIn profile where there is one.
+            the company, the role and a LinkedIn profile.
           </p>
 
           <div className="pool-gate-chips">
