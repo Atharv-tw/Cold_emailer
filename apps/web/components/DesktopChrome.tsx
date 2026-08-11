@@ -119,7 +119,16 @@ export default function DesktopChrome({
               active={pathname === item.href || pathname.startsWith(item.href + "/")}
             />
           ))}
-          {!user.is_paid && <PoolUpsell />}
+          {user.is_paid ? (
+            <NavLink
+              href="/pool"
+              icon="sparkle"
+              label="Contact pool"
+              active={pathname === "/pool" || pathname.startsWith("/pool/")}
+            />
+          ) : (
+            <PoolUpsell />
+          )}
         </nav>
 
         <div className="mt-auto flex flex-col gap-1">
