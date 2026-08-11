@@ -41,7 +41,10 @@ export const config = {
      * static file served from public/ or by Next's metadata conventions has to
      * be matched here, because a rewrite turns a missing extension into a
      * missing file rather than an error anyone notices.
+     *
+     * The photo formats went the same way the first time a .jpg was added to
+     * public/ - listed here now rather than one extension at a time.
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|manifest.webmanifest|sw.js|.*\\.(?:png|svg|ico|webmanifest|xml|txt)).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|manifest.webmanifest|sw.js|.*\\.(?:png|jpg|jpeg|gif|webp|avif|svg|ico|webmanifest|xml|txt)).*)',
   ],
 };

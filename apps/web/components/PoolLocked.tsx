@@ -5,8 +5,12 @@ import Link from "next/link";
  *
  * Deliberately descriptive rather than coy. Somebody deciding whether to pay
  * needs to know what is behind this - how many people, who they are, and what
- * has already been done to the list - and "upgrade to unlock" tells them none
- * of it. The numbers here are the real ones from the loader.
+ * a purchase actually hands them - and "upgrade to unlock" tells them none of
+ * it. The numbers here are the real ones from the loader.
+ *
+ * The loud styling is in `.pool-gate` in globals.css. It is the one screen in
+ * the app that has to sell something, and it reads as an ask rather than as
+ * another row of cards.
  *
  * Rendered instead of calling `/v1/pool` at all. The API would answer 402, but
  * an expected error on every page load is noise that makes a real failure
@@ -19,40 +23,72 @@ export default function PoolLocked({
 }) {
   if (status === "pending") {
     return (
-      <div className="dz-card items-center py-16 text-center">
-        <h3>Your payment is being checked</h3>
-        <p className="text-muted">
-          Someone looks at these by hand, so it is not instant. You will not need to do
-          anything else — access appears here once it is approved.
-        </p>
+      <div className="pool-gate">
+        <div className="pool-gate-glow pool-gate-glow-1" />
+        <div className="pool-gate-inner pool-gate-inner-wide">
+          <div className="pool-gate-art pool-gate-art-wide">
+            <img src="/checking.jpg" alt="" />
+            <span className="pool-gate-sticker">COUNTING</span>
+          </div>
+          <div className="pool-gate-copy">
+            <p className="pool-gate-eyebrow">Almost there</p>
+            <h2>
+              Money received. <em>Checking it.</em>
+            </h2>
+            <p className="pool-gate-lede">
+              Someone looks at these by hand, so it is not instant. Nothing else is
+              needed from you — the list turns up here once it is approved.
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="dz-card items-center py-16 text-center">
-      <h3>The contact pool is a paid list</h3>
-      <p className="mx-auto max-w-prose text-muted">
-        Around 500 founders, co-founders and hiring leads at Indian startups, with the
-        company, the role and a LinkedIn profile where there is one. Addresses that have
-        bounced for anyone are already removed, and domains that do not resolve are
-        marked — so the list does not spend your Gmail reputation proving what somebody
-        else already found out.
-      </p>
-      <p className="mx-auto max-w-prose text-muted">
-        Anyone you add from it becomes an ordinary contact on your own list. Nobody else
-        can see what you write or who has replied.
-      </p>
-      {status === "rejected" && (
-        <p className="text-muted">
-          Your last payment could not be confirmed. You can try again below.
-        </p>
-      )}
-      <Link href="/pool/purchase">
-        <button className="primary" style={{ borderRadius: "2rem", padding: "0.6rem 1.5rem" }}>
-          Get access
-        </button>
-      </Link>
+    <div className="pool-gate">
+      <div className="pool-gate-glow pool-gate-glow-1" />
+      <div className="pool-gate-glow pool-gate-glow-2" />
+      <div className="pool-gate-inner">
+        <div className="pool-gate-art">
+          <img src="/image.png" alt="" />
+          <span className="pool-gate-sticker">PAY UP</span>
+        </div>
+
+        <div className="pool-gate-copy">
+          <p className="pool-gate-eyebrow">Contact pool</p>
+          <h2>
+            Yes, it&rsquo;s <em>paid.</em>
+          </h2>
+          <p className="pool-gate-lede">
+            Around 500 founders, co-founders and hiring leads at Indian startups — with
+            the company, the role and a LinkedIn profile where there is one.
+          </p>
+
+          <div className="pool-gate-chips">
+            <span className="pool-gate-chip">
+              <strong>~500</strong> contacts
+            </span>
+            <span className="pool-gate-chip">Founders &amp; hiring leads</span>
+            <span className="pool-gate-chip">Indian startups</span>
+          </div>
+
+          {status === "rejected" && (
+            <p className="pool-gate-warn">
+              Your last payment could not be confirmed. Try again below.
+            </p>
+          )}
+
+          <Link href="/pool/purchase">
+            <button className="pool-gate-cta">Get access →</button>
+          </Link>
+
+          <p className="pool-gate-fine">
+            Anyone you add becomes an ordinary contact on your own list. Nobody else
+            sees what you write or who replied.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
