@@ -1,7 +1,7 @@
 """Noticing that someone answered.
 
 Continuing to email a person who already replied is the worst thing this
-product can do, so detection has three independent layers and any one of them
+product can do, so detection has four independent layers and any one of them
 is enough:
 
 1. **Push.** `users.watch` on INBOX, delivered through Pub/Sub. Fast, and
@@ -10,9 +10,13 @@ is enough:
    delivering with no error and no callback. A daily job re-arms every
    connected account, because nothing will tell us when it lapses.
 3. **Reconcile.** A slow sweep that reads threads directly for any active
-   target not checked recently. It costs more, so it runs rarely - but it
-   means total push failure still cannot produce a send to someone who
-   replied.
+   target not checked recently. It costs more, so it runs rarely. Its job is
+   to keep the stored status roughly current even when push is dead.
+4. **Pre-send.** `send_one` reads the thread immediately before it sends, and
+   refuses if the answer arrived. This is the layer that actually guarantees
+   nobody is emailed after replying - the three above are all claims about the
+   past, and each can be stale without saying so. Only this one runs at the
+   moment the harm would occur.
 
 Detection is thread-based: any message in the thread not authored by the user
 is inbound. That is more reliable than matching Message-IDs, which clients
@@ -31,13 +35,18 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from outreach_core.classify import Inbound, Verdict, classify
 
-from ..models import DeadAddress, Event, Target, User
+from ..models import DeadAddress, Event, Target, TargetReply, User
 from .gmail import GmailClient, GmailError, GmailNotFound
 from .sending import stop_sequence, suppress
 
 # How stale an active target's thread may get before the reconcile sweep
 # reads it directly.
-RECONCILE_AFTER = timedelta(hours=12)
+#
+# Shorter than the six-hour gap between sweeps, on purpose. At twelve hours a
+# target read at 13:30 was skipped by the 19:30 pass for being only six hours
+# stale and waited for 01:30, so half the scheduled sweeps did nothing and the
+# real worst case was double the number this constant appears to name.
+RECONCILE_AFTER = timedelta(hours=5)
 
 
 @dataclass(frozen=True)
@@ -179,12 +188,65 @@ async def process_thread(
         if result.permanent:
             await record_dead_address(session, target.email, result.reason)
     elif result.verdict is Verdict.OPT_OUT:
+        await _store_reply(session, user=user, target=target, inbound=inbound, message=full)
         await stop_sequence(session, user_id=user.id, target=target, status="opted_out", detail=result.reason)
         await suppress(session, user_id=user.id, email=target.email, reason="asked not to be contacted")
     else:
+        await _store_reply(session, user=user, target=target, inbound=inbound, message=full)
         await stop_sequence(session, user_id=user.id, target=target, status="replied", detail=result.reason)
 
     return ReplyOutcome(str(target.id), result.verdict.value, result.reason, stopped=True)
+
+
+def _sent_at(inbound: Inbound) -> datetime | None:
+    """When the message says it was sent, from its own Date header.
+
+    Not the same as when we noticed. Push failing means the reconcile sweep is
+    what finds a reply, hours later, and stamping detection time would tell the
+    user someone answered just now when they answered this morning.
+
+    Returns None rather than guessing if the header is missing or malformed -
+    the caller shows detection time in that case, which is at least honest
+    about being a different thing.
+    """
+    raw = inbound.header("Date")
+    if not raw:
+        return None
+    from email.utils import parsedate_to_datetime
+
+    try:
+        parsed = parsedate_to_datetime(raw)
+    except (TypeError, ValueError):
+        return None
+    # A Date header may carry no offset, and a naive datetime compared against
+    # an aware one raises rather than sorting wrong. Treat it as UTC.
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+async def _store_reply(session, *, user: User, target: Target, inbound: Inbound, message: dict) -> None:
+    """Keep the inbound message that ended this sequence.
+
+    Only for the two verdicts that are a person writing prose. A bounce is a
+    machine report whose useful half is already parsed into `status_detail`, and
+    an auto-reply defers rather than closing, so neither has a reader.
+
+    Upserts on `target_id`. `process_thread` is idempotent by design and may
+    reach here twice for the same message - the status guard above catches the
+    ordinary repeat, but not a first pass that failed after this write.
+    """
+    await session.execute(
+        pg_insert(TargetReply)
+        .values(
+            target_id=target.id,
+            user_id=user.id,
+            from_email=inbound.from_address[:500],
+            subject=inbound.subject[:500],
+            body=inbound.body,
+            gmail_message_id=str(message.get("id") or "")[:64],
+            received_at=_sent_at(inbound),
+        )
+        .on_conflict_do_nothing(index_elements=["target_id"])
+    )
 
 
 async def record_dead_address(session, email: str, reason: str) -> None:
