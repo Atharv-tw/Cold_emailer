@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -161,6 +162,29 @@ class GmailClient:
 
     async def stop_watch(self) -> dict[str, Any]:
         return await self._request("POST", "/stop")
+
+
+def thread_url(user_email: str, thread_id: str | None) -> str:
+    """A link that opens this thread in the user's own Gmail.
+
+    Cheaper than rendering the conversation ourselves and always complete:
+    every touch we sent plus their reply, quoting and attachments intact, in
+    the client they already use. Nothing is fetched to build it.
+
+    `authuser=` rather than the more common `/u/0/` because a person may have
+    several Google accounts signed in, and `/u/0/` opens whichever is first in
+    that browser profile - which silently shows the wrong mailbox, or an error,
+    for everyone whose sending account is not their first.
+
+    `#all/` rather than `#inbox/` so the link still resolves once the thread has
+    been archived, which is where a finished sequence tends to end up.
+    """
+    if not thread_id or not user_email:
+        return ""
+    return (
+        "https://mail.google.com/mail/u/"
+        f"?authuser={quote(user_email)}#all/{quote(thread_id)}"
+    )
 
 
 class GmailNotFound(GmailError):
