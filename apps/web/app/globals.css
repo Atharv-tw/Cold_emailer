@@ -765,6 +765,55 @@
     font-size: 13px;
     font-weight: 500;
   }
+
+  /* --- work in progress ------------------------------------------------ */
+
+  .working {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--fg);
+  }
+  .working-hint {
+    color: var(--muted);
+    font-weight: 400;
+  }
+  .working-dots {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.22rem;
+  }
+  .working-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: working-pulse 1.2s ease-in-out infinite;
+  }
+  .working-dot:nth-child(2) { animation-delay: 0.15s; }
+  .working-dot:nth-child(3) { animation-delay: 0.3s; }
+
+  /* The resume card is ink-on-black. The accent olive and the muted grey both
+     disappear against it, so the dark tone is not optional decoration. */
+  .working-on-dark { color: rgba(255, 255, 255, 0.92); }
+  .working-on-dark .working-hint { color: rgba(255, 255, 255, 0.6); }
+  .working-on-dark .working-dot { background: var(--lime); }
+
+  @keyframes working-pulse {
+    0%, 80%, 100% { opacity: 0.25; transform: scale(0.8); }
+    40% { opacity: 1; transform: scale(1); }
+  }
+
+  /* Still legible as "busy" without the movement, for anyone who asked the
+     OS not to animate things at them. */
+  @media (prefers-reduced-motion: reduce) {
+    .working-dot {
+      animation: none;
+      opacity: 0.7;
+    }
+  }
 }
 
 /* ==========================================================================
