@@ -29,7 +29,7 @@ class LinksIn(BaseModel):
 
 
 class SendingWindowIn(BaseModel):
-    timezone: str = "UTC"
+    timezone: str = "Asia/Kolkata"
     start: time = time(9, 0)
     end: time = time(17, 0)
     days: list[str] = Field(default_factory=lambda: ["mon", "tue", "wed", "thu", "fri"])
