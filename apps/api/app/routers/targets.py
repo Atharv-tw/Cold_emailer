@@ -19,10 +19,13 @@ from outreach_core.limits import MAX_TOUCHES, TERMINAL_STATUSES, may_schedule_to
 from .. import errors
 from ..deps import CurrentUser, Db, SettingsDep
 from ..errors import AppError
-from ..models import Event, Profile, ProfileExperience, ProfileProject, Suppression, Target
-from ..schemas import TargetIn, TargetOut, TargetUpdate
+from ..models import (
+    Event, Profile, ProfileExperience, ProfileProject, Suppression, Target, TargetReply,
+)
+from ..schemas import ReplyOut, TargetIn, TargetOut, TargetUpdate
 from ..services import guard
 from ..services.completeness import assess
+from ..services.gmail import thread_url
 from ..services.replies import is_dead_address
 from ..services.verification import EmailVerifier, normalise
 
@@ -37,7 +40,7 @@ TERMINAL_EXPLANATIONS = {
 }
 
 
-def _out(target: Target) -> TargetOut:
+def _out(target: Target, user_email: str = "") -> TargetOut:
     verification = target.verification or {}
     # One decision, read twice below. Computed once so `can_send` and
     # `blocked_reason` cannot disagree about the same target.
@@ -69,6 +72,7 @@ def _out(target: Target) -> TargetOut:
         last_touch_at=target.last_touch_at,
         can_send=decision.allowed,
         blocked_reason=decision.reason,
+        gmail_thread_url=thread_url(user_email, target.gmail_thread_id),
     )
 
 
@@ -135,7 +139,7 @@ async def list_targets(
             )
         )
     rows = await session.scalars(query.order_by(Target.created_at.desc()))
-    return [_out(row) for row in rows]
+    return [_out(row, user.email) for row in rows]
 
 
 async def ensure_addable(session, user, email: str, settings) -> None:
@@ -260,7 +264,7 @@ async def create_target(
         )
     )
     await session.commit()
-    return _out(target)
+    return _out(target, user.email)
 
 
 @router.get("/{target_id}", response_model=TargetOut)
@@ -272,7 +276,46 @@ async def read_target(target_id: uuid.UUID, user: CurrentUser, session: Db) -> T
         raise AppError(
             status.HTTP_404_NOT_FOUND, errors.TARGET_NOT_FOUND, "That contact is no longer on your list."
         )
-    return _out(target)
+    return _out(target, user.email)
+
+
+@router.get("/{target_id}/reply", response_model=ReplyOut)
+async def read_reply(target_id: uuid.UUID, user: CurrentUser, session: Db) -> ReplyOut:
+    """What they wrote, in full.
+
+    Reading it marks it read, in the same request. A separate "mark read" call
+    would be one the client could forget, or fire twice, and there is no state
+    where the user has this response open and has not read the thing in it.
+    """
+    reply = await session.scalar(
+        select(TargetReply).where(
+            TargetReply.target_id == target_id, TargetReply.user_id == user.id
+        )
+    )
+    if reply is None:
+        raise AppError(
+            status.HTTP_404_NOT_FOUND,
+            errors.REPLY_NOT_FOUND,
+            "Nothing came back on this one - there is no reply to show.",
+        )
+
+    target = await session.get(Target, target_id)
+    if reply.read_at is None:
+        reply.read_at = datetime.now(timezone.utc)
+        await session.commit()
+
+    return ReplyOut(
+        target_id=str(reply.target_id),
+        from_email=reply.from_email,
+        subject=reply.subject,
+        body=reply.body,
+        # Falls back to when we stored it. `received_at` is None only when the
+        # Date header was missing or unparseable, which is rare and not worth a
+        # blank space in the UI.
+        received_at=reply.received_at or reply.created_at,
+        read_at=reply.read_at,
+        gmail_thread_url=thread_url(user.email, target.gmail_thread_id if target else None),
+    )
 
 
 @router.patch("/{target_id}", response_model=TargetOut)
@@ -308,7 +351,7 @@ async def update_target(
         target.links = {k: v.strip() for k, v in payload.links.model_dump().items() if v.strip()}
 
     await session.commit()
-    return _out(target)
+    return _out(target, user.email)
 
 
 @router.post("/{target_id}/reverify", response_model=TargetOut)
@@ -337,7 +380,7 @@ async def reverify(
     target.verification = verification.to_json()
     target.status_detail = verification.detail if verification.blocks_sending else ""
     await session.commit()
-    return _out(target)
+    return _out(target, user.email)
 
 
 @router.delete("/{target_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -377,7 +420,7 @@ async def stop_target(
         Event(user_id=user.id, target_id=target.id, type="stopped", detail=target.status)
     )
     await session.commit()
-    return _out(target)
+    return _out(target, user.email)
 
 
 async def _suppress(session, user_id: uuid.UUID, email: str, reason: str) -> None:
