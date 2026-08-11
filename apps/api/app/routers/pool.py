@@ -15,10 +15,12 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Query, status
 from sqlalchemy import func, or_, select
 
+from .. import errors
 from ..deps import CurrentUser, Db, SettingsDep
+from ..errors import AppError
 from ..models import Contact, DeadAddress, Event, Target
 from ..schemas import PoolContactOut, PoolPageOut, TargetOut
 from .targets import _out, ensure_addable
@@ -36,8 +38,10 @@ router = APIRouter(prefix="/v1/pool", tags=["pool"])
 # here means a direct call, which is exactly the case worth refusing.
 async def require_pool_access(user) -> None:
     if not user.is_paid:
-        raise HTTPException(
-            status.HTTP_402_PAYMENT_REQUIRED, "The contact pool is a paid feature."
+        raise AppError(
+            status.HTTP_402_PAYMENT_REQUIRED,
+            errors.POOL_ACCESS_REQUIRED,
+            "The contact pool is a paid feature.",
         )
 
 
@@ -165,7 +169,11 @@ async def add_from_pool(
         # Covers "no such id", "that one is private" and "it was retired" with
         # one answer: RLS already hid another user's row, so from here they are
         # the same thing.
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "That contact is not in the pool.")
+        raise AppError(
+            status.HTTP_404_NOT_FOUND,
+            errors.POOL_CONTACT_MISSING,
+            "That contact is not in the pool.",
+        )
 
     # Every gate single-add applies, from the one place they are written.
     await ensure_addable(session, user, contact.email, settings)

@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 
 import { getScheduled } from "@/app/desktop/(app)/dashboard/actions";
 import Modal from "@/components/Modal";
+import type { ActionError } from "@/lib/result";
 import type { ScheduledItem } from "@/lib/types";
 
 function dateKey(iso: string): string {
@@ -31,19 +32,16 @@ function groupByDate(items: ScheduledItem[]): [string, ScheduledItem[]][] {
 
 export default function ScheduledModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [items, setItems] = useState<ScheduledItem[] | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<ActionError | null>(null);
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
     if (!open) return;
-    setError("");
+    setError(null);
     startTransition(async () => {
-      try {
-        const result = await getScheduled();
-        setItems(result.items);
-      } catch (exception) {
-        setError(exception instanceof Error ? exception.message : "Could not load the queue.");
-      }
+      const result = await getScheduled();
+      if (result.ok) setItems(result.data.items);
+      else setError(result.error);
     });
   }, [open]);
 
@@ -52,7 +50,11 @@ export default function ScheduledModal({ open, onClose }: { open: boolean; onClo
   return (
     <Modal open={open} onClose={onClose} title="Scheduled sends" widthClassName="max-w-lg">
       {pending && !items && <p className="text-sm text-muted">Loading…</p>}
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && (
+        <p className="text-sm text-danger">
+          {error.message || "Could not load the queue."}
+        </p>
+      )}
 
       {items && items.length === 0 && (
         <p className="text-sm text-muted">Nothing is queued right now.</p>
@@ -76,7 +78,20 @@ export default function ScheduledModal({ open, onClose }: { open: boolean; onClo
                       {item.company || "—"} · touch {item.step}
                     </div>
                   </div>
-                  <div className="text-xs font-medium text-muted">{timeOf(item.due_at)}</div>
+                  {/* A time here reads as a promise, and a slot with nothing
+                      written in it cannot keep one - the worker looks for a
+                      draft at that step and skips the row when there is none.
+                      So say what is actually true of it instead. */}
+                  {item.needs_draft ? (
+                    <div className="text-xs font-semibold text-danger">Needs writing</div>
+                  ) : item.drafted ? (
+                    <div className="text-xs font-medium text-muted">{timeOf(item.due_at)}</div>
+                  ) : (
+                    <div className="text-right">
+                      <div className="text-xs font-medium text-muted">{timeOf(item.due_at)}</div>
+                      <div className="text-xs text-muted">not written yet</div>
+                    </div>
+                  )}
                 </Link>
               ))}
             </div>

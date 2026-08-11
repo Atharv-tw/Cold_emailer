@@ -9,19 +9,45 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from outreach_core.limits import MAX_TOUCHES, may_schedule_touch
 from outreach_core.templating import lint
 
+from .. import errors
 from ..deps import CurrentUser, Db, GeminiKey, SettingsDep
-from ..models import Message, Profile, ProfileExperience, ProfileProject, Target
+from ..errors import AppError
+from ..models import Message, Profile, ProfileExperience, ProfileProject, ScheduleRow, Target
 from ..services.gemini import AIError, GeminiClient
 from ..services.generation import generate
 
 router = APIRouter(prefix="/v1/targets/{target_id}/draft", tags=["drafts"])
+
+
+async def _unpark(session, target_id: uuid.UUID, step: int) -> None:
+    """Put a `needs_draft` row back in the queue now that there are words for it.
+
+    The worker parks a row that was due with nothing written (worker.py, see
+    `NEEDS_DRAFT_AFTER`), which takes it out of the sweep entirely. Writing the
+    draft is the thing that was missing, so writing it is what undoes the park -
+    otherwise the row is stranded and the send that was scheduled never happens,
+    which is the exact failure parking exists to make visible.
+
+    The due time is left alone. It is already in the past, so the next tick
+    picks the row up; moving it would silently reschedule a send the user
+    thought was overdue.
+    """
+    row = await session.scalar(
+        select(ScheduleRow).where(
+            ScheduleRow.target_id == target_id,
+            ScheduleRow.step == step,
+            ScheduleRow.state == "needs_draft",
+        )
+    )
+    if row is not None:
+        row.state = "pending"
 
 
 class GenerateIn(BaseModel):
@@ -51,7 +77,11 @@ async def _load(session, user_id, target_id: uuid.UUID):
         select(Target).where(Target.id == target_id, Target.user_id == user_id)
     )
     if target is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "no such target")
+        raise AppError(
+            status.HTTP_404_NOT_FOUND,
+            errors.TARGET_NOT_FOUND,
+            "That contact is no longer on your list.",
+        )
 
     decision = may_schedule_touch(
         status=target.status,
@@ -59,7 +89,7 @@ async def _load(session, user_id, target_id: uuid.UUID):
         verification=(target.verification or {}).get("status"),
     )
     if not decision.allowed:
-        raise HTTPException(status.HTTP_409_CONFLICT, decision.reason)
+        raise AppError(status.HTTP_409_CONFLICT, errors.SEND_BLOCKED, decision.reason)
 
     profile = await session.scalar(select(Profile).where(Profile.user_id == user_id))
     projects = list(
@@ -127,7 +157,7 @@ async def generate_draft(
             template_key=payload.template_key,
         )
     except AIError as exc:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc)) from exc
+        raise AppError(status.HTTP_502_BAD_GATEWAY, errors.AI_FAILED, str(exc)) from exc
 
     message = await session.scalar(
         select(Message).where(
@@ -141,6 +171,7 @@ async def generate_draft(
     # A follow-up replies in the existing thread, so it keeps that subject.
     message.subject = draft.subject if step == 1 else (target.thread_subject or draft.subject)
     message.body = draft.body
+    await _unpark(session, target.id, step)
     await session.commit()
     return _out(target, message)
 
@@ -155,7 +186,9 @@ async def read_draft(target_id: uuid.UUID, user: CurrentUser, session: Db) -> Dr
         )
     )
     if message is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "nothing drafted yet")
+        raise AppError(
+            status.HTTP_404_NOT_FOUND, errors.NO_DRAFT, "Nothing has been drafted yet."
+        )
     return _out(target, message)
 
 
@@ -182,9 +215,14 @@ async def save_draft(
         session.add(message)
 
     if step == 1 and not payload.subject.strip():
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "A first email needs a subject.")
+        raise AppError(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            errors.MISSING_SUBJECT,
+            "A first email needs a subject.",
+        )
 
     message.subject = payload.subject.strip() or target.thread_subject
     message.body = payload.body.rstrip()
+    await _unpark(session, target.id, step)
     await session.commit()
     return _out(target, message)

@@ -133,12 +133,9 @@ export default function SettingsForm({ user }: { user: SessionUser }) {
             if (!confirm("Delete every resume and everything extracted from one?")) return;
             setError("");
             startTransition(async () => {
-              try {
-                await deleteMyData();
-                setStatus("Deleted.");
-              } catch (exception) {
-                setError(exception instanceof Error ? exception.message : "Could not delete that.");
-              }
+              const result = await deleteMyData();
+              if (result.ok) setStatus("Deleted.");
+              else setError(result.error.message || "Could not delete that.");
             });
           }}
         >

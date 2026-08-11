@@ -2,21 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 
-import { api, ApiError } from "@/lib/api";
+import { api } from "@/lib/api";
+// A 403 here means the account lost the operator role between rendering the
+// page and clicking - worth showing rather than swallowing, which is what
+// `attempt` does with any `ApiError`.
+import { attempt, type Result } from "@/lib/result";
 import type { AdminPayment, AdminUserRow } from "@/lib/types";
-
-type Result<T> = { ok: true; data: T } | { ok: false; error: string };
-
-async function attempt<T>(run: () => Promise<T>): Promise<Result<T>> {
-  try {
-    return { ok: true, data: await run() };
-  } catch (error) {
-    // A 403 here means the account lost the operator role between rendering
-    // the page and clicking - worth showing rather than swallowing.
-    if (error instanceof ApiError) return { ok: false, error: error.message };
-    throw error;
-  }
-}
 
 export async function reviewPayment(
   paymentId: string,

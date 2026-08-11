@@ -70,7 +70,7 @@ export default function PurchasePanel({ billing }: { billing: Billing }) {
     const result = await submitPaymentProof(formData);
     setBusy(false);
     if (result.ok) setDone(true);
-    else setError(result.error);
+    else setError(result.error.message || "That did not go through.");
   }
 
   return (

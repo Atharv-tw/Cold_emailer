@@ -17,7 +17,10 @@ export default function NewEmailModal({ open, onClose }: { open: boolean; onClos
   function onQueryChange(value: string) {
     setQuery(value);
     startTransition(async () => {
-      setResults(await searchTargets(value));
+      // A failed search shows as "nobody matches" rather than an error: there
+      // is nothing for the user to do about it but type again.
+      const found = await searchTargets(value);
+      setResults(found.ok ? found.data : []);
     });
   }
 

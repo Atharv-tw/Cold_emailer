@@ -78,6 +78,18 @@ class ScheduledItem(BaseModel):
     company: str
     step: int
     due_at: datetime
+    # A pending row is a slot, not an email. The worker looks for a draft at
+    # that step and skips the row when there is none, so a slot with nothing
+    # written sends nothing - and listing it as "queued" promises a send that
+    # will not happen. The UI needs to be able to tell the two apart.
+    drafted: bool = False
+    # Parked by the worker: it was due, nothing was written for long enough
+    # that it was clearly not coming, and it is no longer being scanned. Only
+    # writing the draft brings it back.
+    needs_draft: bool = False
+    # Server-side so every surface agrees on what "urgent" means. Lower first:
+    # 0 parked, 1 due inside a day and unwritten, 2 everything else.
+    urgency: int = 2
 
 
 class ScheduledOut(BaseModel):
@@ -271,18 +283,41 @@ async def dashboard(user: CurrentUser, session: Db) -> DashboardOut:
 async def dashboard_scheduled(user: CurrentUser, session: Db) -> ScheduledOut:
     """The full pending follow-up queue, for the dashboard's scheduled-sends
     modal. `/dashboard` itself only carries the next-24h slice of this."""
+    now = datetime.now(timezone.utc)
+    soon = now + timedelta(hours=24)
+
+    # `needs_draft` too, not only `pending`. A parked row is the one the user
+    # most needs to see - it is the follow-up that has already missed its slot -
+    # and leaving it out of this list is how it stayed invisible.
     rows = list(
         await session.scalars(
             select(ScheduleRow)
-            .where(ScheduleRow.user_id == user.id, ScheduleRow.state == "pending")
+            .where(
+                ScheduleRow.user_id == user.id,
+                ScheduleRow.state.in_(("pending", "needs_draft")),
+            )
             .order_by(ScheduleRow.due_at)
         )
     )
+
+    # One query rather than one per row: this list is unbounded in principle,
+    # and the N+1 on targets below is already one too many.
+    drafted_steps = {
+        (target_id, step)
+        for target_id, step in await session.execute(
+            select(Message.target_id, Message.step).where(
+                Message.user_id == user.id, Message.status == "draft"
+            )
+        )
+    }
+
     items: list[ScheduledItem] = []
     for row in rows:
         target = await session.get(Target, row.target_id)
         if target is None:
             continue
+        drafted = (row.target_id, row.step) in drafted_steps
+        needs_draft = row.state == "needs_draft"
         items.append(
             ScheduledItem(
                 target_id=str(target.id),
@@ -291,8 +326,15 @@ async def dashboard_scheduled(user: CurrentUser, session: Db) -> ScheduledOut:
                 company=target.company,
                 step=row.step,
                 due_at=row.due_at,
+                drafted=drafted,
+                needs_draft=needs_draft,
+                urgency=0 if needs_draft else 1 if (not drafted and row.due_at <= soon) else 2,
             )
         )
+
+    # Urgency first, then the clock inside each band, so "write this one now"
+    # sorts above "this goes out on Friday" without losing chronology.
+    items.sort(key=lambda item: (item.urgency, item.due_at))
     return ScheduledOut(items=items)
 
 

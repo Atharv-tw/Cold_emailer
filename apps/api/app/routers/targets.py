@@ -11,12 +11,14 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Query, status
 from sqlalchemy import delete, or_, select
 
 from outreach_core.limits import MAX_TOUCHES, TERMINAL_STATUSES, may_schedule_touch, remaining_touches
 
+from .. import errors
 from ..deps import CurrentUser, Db, SettingsDep
+from ..errors import AppError
 from ..models import Event, Profile, ProfileExperience, ProfileProject, Suppression, Target
 from ..schemas import TargetIn, TargetOut, TargetUpdate
 from ..services import guard
@@ -79,12 +81,17 @@ async def _require_usable_profile(session, user_id) -> None:
         await session.scalars(select(ProfileExperience).where(ProfileExperience.user_id == user_id))
     )
     if profile is None:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Fill in your profile first.")
+        raise AppError(
+            status.HTTP_409_CONFLICT,
+            errors.PROFILE_INCOMPLETE,
+            "Fill in your profile first - an email cannot be written without it.",
+        )
 
     score = assess(profile, projects, experience)
     if score.blocks_targets:
-        raise HTTPException(
+        raise AppError(
             status.HTTP_409_CONFLICT,
+            errors.PROFILE_INCOMPLETE,
             "Your profile is not complete enough to write from yet. Still needed: "
             + "; ".join(score.prompts),
         )
@@ -141,7 +148,11 @@ async def ensure_addable(session, user, email: str, settings) -> None:
     loudly - it would just quietly send the email.
     """
     if email == normalise(user.email):
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "That is your own address.")
+        raise AppError(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            errors.OWN_ADDRESS,
+            "That is your own address.",
+        )
 
     await _require_usable_profile(session, user.id)
 
@@ -152,8 +163,9 @@ async def ensure_addable(session, user, email: str, settings) -> None:
         select(Suppression).where(Suppression.user_id == user.id, Suppression.email == email)
     )
     if suppressed is not None:
-        raise HTTPException(
+        raise AppError(
             status.HTTP_409_CONFLICT,
+            errors.SUPPRESSED,
             f"You cannot contact {email} again: {suppressed.reason or 'they opted out'}.",
         )
 
@@ -161,8 +173,9 @@ async def ensure_addable(session, user, email: str, settings) -> None:
     # same reason a suppression is: finding out now beats finding out six days
     # later when the send fails.
     if await is_dead_address(session, email):
-        raise HTTPException(
+        raise AppError(
             status.HTTP_409_CONFLICT,
+            errors.DEAD_ADDRESS,
             f"{email} does not exist - mail to it has already hard-bounced. "
             "Check the address, or pick someone else.",
         )
@@ -172,13 +185,15 @@ async def ensure_addable(session, user, email: str, settings) -> None:
     )
     if existing is not None:
         if existing.status in TERMINAL_STATUSES:
-            raise HTTPException(
+            raise AppError(
                 status.HTTP_409_CONFLICT,
+                errors.SEQUENCE_ENDED,
                 TERMINAL_EXPLANATIONS.get(existing.status, f"That sequence ended ({existing.status}).")
                 + " Re-adding them is not possible.",
             )
-        raise HTTPException(
+        raise AppError(
             status.HTTP_409_CONFLICT,
+            errors.DUPLICATE_TARGET,
             f"{email} is already on your list"
             + (f" ({existing.touches_sent} of {MAX_TOUCHES} touches sent)." if existing.touches_sent else "."),
         )
@@ -187,8 +202,9 @@ async def ensure_addable(session, user, email: str, settings) -> None:
     # told six days later that this one was never going to go out. Currently in
     # monitor mode, so this returns False - see services/guard.py.
     if await guard.is_blocked(session, email, settings.recipient_guard_secret_bytes):
-        raise HTTPException(
+        raise AppError(
             status.HTTP_409_CONFLICT,
+            errors.GUARD_BLOCKED,
             "That person is being contacted by a lot of accounts here at the "
             "moment, so this platform is not sending them anything further "
             "right now. Try again in a week.",
@@ -253,7 +269,9 @@ async def read_target(target_id: uuid.UUID, user: CurrentUser, session: Db) -> T
         select(Target).where(Target.id == target_id, Target.user_id == user.id)
     )
     if target is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "no such target")
+        raise AppError(
+            status.HTTP_404_NOT_FOUND, errors.TARGET_NOT_FOUND, "That contact is no longer on your list."
+        )
     return _out(target)
 
 
@@ -265,10 +283,13 @@ async def update_target(
         select(Target).where(Target.id == target_id, Target.user_id == user.id)
     )
     if target is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "no such target")
+        raise AppError(
+            status.HTTP_404_NOT_FOUND, errors.TARGET_NOT_FOUND, "That contact is no longer on your list."
+        )
     if target.status in TERMINAL_STATUSES:
-        raise HTTPException(
+        raise AppError(
             status.HTTP_409_CONFLICT,
+            errors.SEQUENCE_ENDED,
             TERMINAL_EXPLANATIONS.get(target.status, "That sequence has ended."),
         )
 
@@ -304,7 +325,9 @@ async def reverify(
         select(Target).where(Target.id == target_id, Target.user_id == user.id)
     )
     if target is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "no such target")
+        raise AppError(
+            status.HTTP_404_NOT_FOUND, errors.TARGET_NOT_FOUND, "That contact is no longer on your list."
+        )
 
     verifier = EmailVerifier(
         api_key=settings.quickemailverification_api_key,
@@ -323,7 +346,9 @@ async def delete_target(target_id: uuid.UUID, user: CurrentUser, session: Db) ->
         select(Target).where(Target.id == target_id, Target.user_id == user.id)
     )
     if target is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "no such target")
+        raise AppError(
+            status.HTTP_404_NOT_FOUND, errors.TARGET_NOT_FOUND, "That contact is no longer on your list."
+        )
 
     # Deleting a target does not delete a suppression. Someone who asked not to
     # be contacted stays that way whatever happens to the row that recorded it.
@@ -340,7 +365,9 @@ async def stop_target(
         select(Target).where(Target.id == target_id, Target.user_id == user.id)
     )
     if target is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "no such target")
+        raise AppError(
+            status.HTTP_404_NOT_FOUND, errors.TARGET_NOT_FOUND, "That contact is no longer on your list."
+        )
 
     target.status = "opted_out" if suppress else "paused"
     target.status_detail = "stopped by you"

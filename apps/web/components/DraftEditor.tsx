@@ -10,7 +10,9 @@ import {
   scheduleSend,
   sendNow,
 } from "@/app/desktop/(app)/dashboard/actions";
+import { ErrorModal, InlineError } from "@/components/ActionError";
 import QueuedNotice from "@/components/QueuedNotice";
+import type { ActionError, Result } from "@/lib/result";
 import { useGeminiKey } from "@/lib/useGeminiKey";
 import type { Draft, EmailTemplate, Target } from "@/lib/types";
 
@@ -20,6 +22,19 @@ function when(value: string): string {
     dateStyle: "medium",
     timeStyle: "short",
   });
+}
+
+/** Carries a refusal out of a sequence of steps. Caught by `run` below. */
+class Refused extends Error {
+  constructor(readonly error: ActionError) {
+    super(error.message);
+  }
+}
+
+/** The value, or an abort that `run` turns into the message on screen. */
+function need<T>(result: Result<T>): T {
+  if (result.ok) return result.data;
+  throw new Refused(result.error);
 }
 
 /**
@@ -56,7 +71,7 @@ export default function DraftEditor({
   const [instruction, setInstruction] = useState("");
   const [templateKey, setTemplateKey] = useState(templates[0]?.key ?? "specific_hook");
   const [status, setStatus] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<ActionError | null>(null);
   const [pending, startTransition] = useTransition();
   const { key: geminiKey, hasKey: hasGeminiKey } = useGeminiKey();
 
@@ -64,13 +79,26 @@ export default function DraftEditor({
   const isFollowUp = step > 1;
   const unsaved = subject !== saved.subject || body !== saved.body;
 
+  /**
+   * Run a sequence of steps, stopping at the first refusal.
+   *
+   * Several buttons here are two calls in a row - save, then send - and the
+   * second must not run when the first was refused. `need` is what makes
+   * "stop here and show this" a single expression inside the sequence rather
+   * than an if after every await.
+   */
   function run(work: () => Promise<void>) {
-    setError("");
+    setError(null);
     startTransition(async () => {
       try {
         await work();
-      } catch (exception) {
-        setError(exception instanceof Error ? exception.message : "Something went wrong.");
+      } catch (caught) {
+        setStatus("");
+        setError(
+          caught instanceof Refused
+            ? caught.error
+            : { code: "", message: "Something went wrong. Try again." },
+        );
       }
     });
   }
@@ -132,7 +160,9 @@ export default function DraftEditor({
           onClick={() =>
             run(async () => {
               setStatus("Writing…");
-              const draft = await generateDraft(target.id, instruction, templateKey, geminiKey);
+              const draft = need(
+                await generateDraft(target.id, instruction, templateKey, geminiKey),
+              );
               setSubject(draft.subject);
               setBody(draft.body);
               setSaved({ subject: draft.subject, body: draft.body });
@@ -179,7 +209,8 @@ export default function DraftEditor({
       {queuedFor && <QueuedNotice queuedFor={queuedFor} />}
 
       {status && <p className="ok">{status}</p>}
-      {error && <p className="error">{error}</p>}
+      <InlineError error={error} />
+      <ErrorModal error={error} onClose={() => setError(null)} />
 
       <section>
         <button
@@ -188,7 +219,7 @@ export default function DraftEditor({
           disabled={pending || !body.trim()}
           onClick={() =>
             run(async () => {
-              const draft = await saveDraft(target.id, subject, body);
+              const draft = need(await saveDraft(target.id, subject, body));
               setSaved({ subject, body });
               setWarnings(draft.warnings);
               setStatus(
@@ -214,7 +245,7 @@ export default function DraftEditor({
               setSubject(saved.subject);
               setBody(saved.body);
               setStatus("Reverted to the last saved version.");
-              setError("");
+              setError(null);
             }}
           >
             Discard changes
@@ -230,8 +261,8 @@ export default function DraftEditor({
           disabled={pending || !body.trim()}
           onClick={() =>
             run(async () => {
-              await saveDraft(target.id, subject, body);
-              const result = await scheduleSend(target.id);
+              need(await saveDraft(target.id, subject, body));
+              const result = need(await scheduleSend(target.id));
               // Same honesty as the panel below: a due time in the past or the
               // immediate present means "next tick", not that exact minute.
               const at = result.scheduled_for;
@@ -256,7 +287,7 @@ export default function DraftEditor({
             disabled={pending}
             onClick={() =>
               run(async () => {
-                await cancelScheduledSend(target.id);
+                need(await cancelScheduledSend(target.id));
                 setStatus("Taken out of the queue. The draft is still here.");
                 router.refresh();
               })
@@ -272,9 +303,9 @@ export default function DraftEditor({
           disabled={pending || !body.trim()}
           onClick={() =>
             run(async () => {
-              await saveDraft(target.id, subject, body);
+              need(await saveDraft(target.id, subject, body));
               if (!confirm(`Send this to ${target.email} now?`)) return;
-              await sendNow(target.id);
+              need(await sendNow(target.id));
               setStatus("Sent.");
               router.refresh();
             })

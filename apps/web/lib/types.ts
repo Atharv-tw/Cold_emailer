@@ -246,6 +246,12 @@ export type ScheduledItem = {
   company: string;
   step: number;
   due_at: string;
+  /** A slot with no draft written for it sends nothing when its time comes. */
+  drafted: boolean;
+  /** Parked by the worker: due, never written, no longer being scanned. */
+  needs_draft: boolean;
+  /** 0 parked, 1 unwritten and due within a day, 2 everything else. */
+  urgency: number;
 };
 
 export type ScheduledOut = { items: ScheduledItem[] };

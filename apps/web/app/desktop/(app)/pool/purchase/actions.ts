@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 
-import { api, ApiError } from "@/lib/api";
+import { api } from "@/lib/api";
+import { attempt, type Result } from "@/lib/result";
 import type { PaymentRequestOut } from "@/lib/types";
 
 /**
@@ -15,23 +16,16 @@ import type { PaymentRequestOut } from "@/lib/types";
  * one-open-claim rule are applied, and none of those are worth having if the
  * client can skip them.
  */
-export async function submitPaymentProof(
-  formData: FormData,
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  try {
-    await api<PaymentRequestOut>("/v1/billing/request", {
-      method: "POST",
-      body: formData,
-    });
-  } catch (error) {
-    // The API's message is written for the person reading it - "that image is
-    // larger than 5 MB", "you already have a claim waiting" - so it is passed
-    // through rather than replaced with something vaguer.
-    if (error instanceof ApiError) return { ok: false, error: error.message };
-    throw error;
+export async function submitPaymentProof(formData: FormData): Promise<Result<void>> {
+  // The API's message is written for the person reading it - "that image is
+  // larger than 5 MB", "you already have a claim waiting" - so `attempt`
+  // passes it through rather than replacing it with something vaguer.
+  const result = await attempt(async () => {
+    await api<PaymentRequestOut>("/v1/billing/request", { method: "POST", body: formData });
+  });
+  if (result.ok) {
+    revalidatePath("/pool");
+    revalidatePath("/pool/purchase");
   }
-
-  revalidatePath("/pool");
-  revalidatePath("/pool/purchase");
-  return { ok: true };
+  return result;
 }

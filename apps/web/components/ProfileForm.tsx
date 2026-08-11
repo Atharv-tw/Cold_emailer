@@ -364,7 +364,13 @@ export default function ProfileForm({ profile, disclosure, user }: Props) {
       form.append("file", resumeFile);
       if (keepOriginal) form.append("keep_original", "on");
 
-      const parsed = await uploadResume(form, geminiKey);
+      const read = await uploadResume(form, geminiKey);
+      if (!read.ok) {
+        setStatus("");
+        setError(read.error.message || "Upload failed.");
+        return;
+      }
+      const parsed = read.data;
       const touched = new Set<string>();
 
       if (parsed.headline) {
@@ -399,9 +405,6 @@ export default function ProfileForm({ profile, disclosure, user }: Props) {
           ? "Read it. Check everything, then save — nothing is on your profile yet."
           : "Read it, and the file has been deleted. Check everything, then save.",
       );
-    } catch (exception) {
-      setStatus("");
-      setError(exception instanceof Error ? exception.message : "Upload failed.");
     } finally {
       setReading(false);
     }
@@ -413,56 +416,55 @@ export default function ProfileForm({ profile, disclosure, user }: Props) {
     setError("");
     setAvatarPreview(URL.createObjectURL(file));
     startAvatarTransition(async () => {
-      try {
-        const form = new FormData();
-        form.append("file", file);
-        await uploadAvatar(form);
-        setStatus("Photo updated.");
-      } catch (exception) {
-        setAvatarPreview(user.avatar);
-        setError(exception instanceof Error ? exception.message : "Could not upload that image.");
-      }
+      const form = new FormData();
+      form.append("file", file);
+      const result = await uploadAvatar(form);
+      if (result.ok) return setStatus("Photo updated.");
+      setAvatarPreview(user.avatar);
+      setError(result.error.message || "Could not upload that image.");
     });
   }
 
   function onAvatarRemove() {
     setError("");
     startAvatarTransition(async () => {
-      try {
-        await removeAvatar();
-        setAvatarPreview("");
-        setStatus("Photo removed.");
-      } catch (exception) {
-        setError(exception instanceof Error ? exception.message : "Could not remove that image.");
-      }
+      const result = await removeAvatar();
+      if (!result.ok) return setError(result.error.message || "Could not remove that image.");
+      setAvatarPreview("");
+      setStatus("Photo removed.");
     });
   }
 
   function onSave() {
     setError("");
     startTransition(async () => {
-      try {
-        await saveProfile({
-          headline,
-          bio,
-          education: education.map((line) => line.trim()).filter(Boolean).join("\n"),
-          availability,
-          links,
-          sending_window: {
-            timezone,
-            start: windowStart,
-            end: windowEnd,
-            days: sendDays,
-          },
-        });
-        await saveProjects(projects);
-        await saveExperience(experience);
-        setExtracted(new Set());
-        setDirty(false);
-        setStatus("Saved.");
-      } catch (exception) {
-        setError(exception instanceof Error ? exception.message : "Could not save.");
+      // Three calls, and a refusal in any of them stops the rest: saving the
+      // projects when the basics were rejected would leave the profile half
+      // written with a green "Saved." over it.
+      for (const step of [
+        () =>
+          saveProfile({
+            headline,
+            bio,
+            education: education.map((line) => line.trim()).filter(Boolean).join("\n"),
+            availability,
+            links,
+            sending_window: {
+              timezone,
+              start: windowStart,
+              end: windowEnd,
+              days: sendDays,
+            },
+          }),
+        () => saveProjects(projects),
+        () => saveExperience(experience),
+      ]) {
+        const result = await step();
+        if (!result.ok) return setError(result.error.message || "Could not save.");
       }
+      setExtracted(new Set());
+      setDirty(false);
+      setStatus("Saved.");
     });
   }
 

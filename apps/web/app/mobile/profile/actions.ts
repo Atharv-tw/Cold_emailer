@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { api } from "@/lib/api";
+import { attempt, refuse, type Result } from "@/lib/result";
 import type { ParsedResume, Profile } from "@/lib/types";
 
 /**
@@ -13,10 +14,10 @@ import type { ParsedResume, Profile } from "@/lib/types";
  * there is no credential in the browser to authenticate it with.
  */
 
-export async function uploadResume(form: FormData): Promise<ParsedResume> {
+export async function uploadResume(form: FormData): Promise<Result<ParsedResume>> {
   const file = form.get("file");
   if (!(file instanceof File) || file.size === 0) {
-    throw new Error("Choose a PDF or .docx first.");
+    return refuse("no_file", "Choose a PDF or .docx first.");
   }
 
   const forwarded = new FormData();
@@ -26,37 +27,35 @@ export async function uploadResume(form: FormData): Promise<ParsedResume> {
   // `api` leaves Content-Type off a FormData body so fetch can write the
   // multipart boundary itself. Passing `headers: {}` here does not achieve
   // that - spreading an empty object removes nothing.
-  return api<ParsedResume>("/v1/resumes", { method: "POST", body: forwarded });
+  return attempt(() => api<ParsedResume>("/v1/resumes", { method: "POST", body: forwarded }));
 }
 
-export async function saveProfile(payload: unknown): Promise<Profile> {
-  const profile = await api<Profile>("/v1/profile", {
-    method: "PUT",
-    body: JSON.stringify(payload),
-  });
-  revalidatePath("/profile");
-  return profile;
+export async function saveProfile(payload: unknown): Promise<Result<Profile>> {
+  const result = await attempt(() =>
+    api<Profile>("/v1/profile", { method: "PUT", body: JSON.stringify(payload) }),
+  );
+  if (result.ok) revalidatePath("/profile");
+  return result;
 }
 
-export async function saveProjects(payload: unknown): Promise<Profile> {
-  const profile = await api<Profile>("/v1/profile/projects", {
-    method: "PUT",
-    body: JSON.stringify(payload),
-  });
-  revalidatePath("/profile");
-  return profile;
+export async function saveProjects(payload: unknown): Promise<Result<Profile>> {
+  const result = await attempt(() =>
+    api<Profile>("/v1/profile/projects", { method: "PUT", body: JSON.stringify(payload) }),
+  );
+  if (result.ok) revalidatePath("/profile");
+  return result;
 }
 
-export async function saveExperience(payload: unknown): Promise<Profile> {
-  const profile = await api<Profile>("/v1/profile/experience", {
-    method: "PUT",
-    body: JSON.stringify(payload),
-  });
-  revalidatePath("/profile");
-  return profile;
+export async function saveExperience(payload: unknown): Promise<Result<Profile>> {
+  const result = await attempt(() =>
+    api<Profile>("/v1/profile/experience", { method: "PUT", body: JSON.stringify(payload) }),
+  );
+  if (result.ok) revalidatePath("/profile");
+  return result;
 }
 
-export async function deleteMyData(): Promise<void> {
-  await api<void>("/v1/profile/data", { method: "DELETE" });
-  revalidatePath("/profile");
+export async function deleteMyData(): Promise<Result<void>> {
+  const result = await attempt(() => api<void>("/v1/profile/data", { method: "DELETE" }));
+  if (result.ok) revalidatePath("/profile");
+  return result;
 }

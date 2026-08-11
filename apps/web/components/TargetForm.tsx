@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { createTarget } from "@/app/desktop/(app)/dashboard/actions";
+import { ErrorModal, InlineError } from "@/components/ActionError";
+import type { ActionError } from "@/lib/result";
 
 /**
  * Adding someone.
@@ -43,7 +45,7 @@ const INTENTS = [
 
 export default function TargetForm() {
   const router = useRouter();
-  const [error, setError] = useState("");
+  const [error, setError] = useState<ActionError | null>(null);
   const [pending, startTransition] = useTransition();
 
   const [form, setForm] = useState({
@@ -65,20 +67,21 @@ export default function TargetForm() {
   }
 
   function submit() {
-    setError("");
+    setError(null);
     startTransition(async () => {
-      try {
-        const target = await createTarget({ ...form, links });
-        router.push(`/targets/${target.id}`);
-      } catch (exception) {
-        setError(exception instanceof Error ? exception.message : "Could not add them.");
-      }
+      // Refusals arrive as a value, not a throw: an incomplete profile, an
+      // address already on the list, an opt-out. Each of those is a sentence
+      // the user can act on, and one of them opens a modal instead.
+      const result = await createTarget({ ...form, links });
+      if (result.ok) router.push(`/targets/${result.data.id}`);
+      else setError(result.error);
     });
   }
 
   return (
     <div className="stack">
-      {error && <p className="error">{error}</p>}
+      <ErrorModal error={error} onClose={() => setError(null)} />
+      <InlineError error={error} />
 
       <section>
         <label>

@@ -21,7 +21,7 @@ describe("TargetForm", () => {
   });
 
   it("sends the answers and moves to the new target", async () => {
-    createTarget.mockResolvedValue({ id: "t1" });
+    createTarget.mockResolvedValue({ ok: true, data: { id: "t1" } });
     render(<TargetForm />);
 
     await userEvent.type(screen.getByPlaceholderText("alex@example.com"), "alex@example.com");
@@ -39,13 +39,36 @@ describe("TargetForm", () => {
   });
 
   it("shows the API's reason when adding is refused", async () => {
-    createTarget.mockRejectedValue(new Error("That is your own address."));
+    // A refusal is a returned value, not a throw: a thrown one never reaches
+    // the browser in a production build. See lib/result.ts.
+    createTarget.mockResolvedValue({
+      ok: false,
+      error: { code: "own_address", message: "That is your own address." },
+    });
     render(<TargetForm />);
 
     await userEvent.type(screen.getByPlaceholderText("alex@example.com"), "me@example.com");
     await userEvent.click(screen.getByRole("button", { name: /Add them/ }));
 
     expect(await screen.findByText("That is your own address.")).toBeInTheDocument();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("sends an incomplete profile to the profile page instead of printing it", async () => {
+    createTarget.mockResolvedValue({
+      ok: false,
+      error: {
+        code: "profile_incomplete",
+        message: "Your profile is not complete enough to write from yet.",
+      },
+    });
+    render(<TargetForm />);
+
+    await userEvent.type(screen.getByPlaceholderText("alex@example.com"), "alex@example.com");
+    await userEvent.click(screen.getByRole("button", { name: /Add them/ }));
+
+    const link = await screen.findByRole("link", { name: "Go to profile" });
+    expect(link).toHaveAttribute("href", "/profile");
     expect(push).not.toHaveBeenCalled();
   });
 });

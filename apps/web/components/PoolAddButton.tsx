@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import Modal from "@/components/Modal";
+import { ErrorModal, InlineError } from "@/components/ActionError";
 import { addFromPool } from "@/lib/pool-actions";
+import type { ActionError } from "@/lib/result";
 
 /**
  * Adds one pool contact to the user's list, then goes to the new target.
@@ -18,30 +18,20 @@ import { addFromPool } from "@/lib/pool-actions";
  * Failures are shown in place. The API refuses an add for several ordinary
  * reasons - already on the list, suppressed, the address has since bounced -
  * and each of those is something the user should read, not a toast that
- * disappears.
+ * disappears. An incomplete profile is the exception: nothing on this page
+ * fixes it, so `ErrorModal` sends them to the profile instead.
  */
 export default function PoolAddButton({ contactId }: { contactId: string }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [error, setError] = useState("");
-  const [profileError, setProfileError] = useState(false);
-  const [profileErrorMsg, setProfileErrorMsg] = useState("");
+  const [error, setError] = useState<ActionError | null>(null);
 
   function add() {
-    setError("");
-    setProfileError(false);
+    setError(null);
     startTransition(async () => {
       const result = await addFromPool(contactId);
-      if (result.success) {
-        router.push(`/targets/${result.target.id}`);
-      } else {
-        if (result.error.toLowerCase().includes("profile")) {
-          setProfileErrorMsg(result.error);
-          setProfileError(true);
-        } else {
-          setError(result.error);
-        }
-      }
+      if (result.ok) router.push(`/targets/${result.data.id}`);
+      else setError(result.error);
     });
   }
 
@@ -57,29 +47,10 @@ export default function PoolAddButton({ contactId }: { contactId: string }) {
         >
           {pending ? "Adding…" : "Add to my list"}
         </button>
-        {error && (
-          <p role="alert" className="text-xs text-danger">
-            {error}
-          </p>
-        )}
+        <InlineError error={error} className="text-xs text-danger" />
       </div>
 
-      <Modal open={profileError} onClose={() => setProfileError(false)} title="Complete your profile">
-        <div className="flex flex-col gap-4">
-          <p className="text-sm text-secondary">
-            {profileErrorMsg || "You need to complete your profile before you can start reaching out to people from the pool."}
-          </p>
-          <div className="flex justify-end pt-2">
-            <Link
-              href="/profile"
-              className="button primary"
-              onClick={() => setProfileError(false)}
-            >
-              Go to profile
-            </Link>
-          </div>
-        </div>
-      </Modal>
+      <ErrorModal error={error} onClose={() => setError(null)} />
     </>
   );
 }

@@ -3,6 +3,8 @@
 import { useRef, useState, useTransition } from "react";
 
 import { commitImport, previewImport } from "@/app/desktop/(app)/targets/import-actions";
+import { ErrorModal, InlineError } from "@/components/ActionError";
+import type { ActionError } from "@/lib/result";
 import type {
   ImportCommitResult,
   ImportPreview,
@@ -47,21 +49,20 @@ export default function ImportWizard() {
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [result, setResult] = useState<ImportCommitResult | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<ActionError | null>(null);
   const [pending, startTransition] = useTransition();
 
   function runPreview(chosenFile: File, chosenMapping: Record<string, string>) {
-    setError("");
+    setError(null);
     setResult(null);
     startTransition(async () => {
-      try {
-        const next = await previewImport(buildForm(chosenFile, chosenMapping));
-        setPreview(next);
-        setMapping(next.mapping);
-      } catch (exception) {
+      const next = await previewImport(buildForm(chosenFile, chosenMapping));
+      if (!next.ok) {
         setPreview(null);
-        setError(exception instanceof Error ? exception.message : "Could not read that file.");
+        return setError(next.error);
       }
+      setPreview(next.data);
+      setMapping(next.data.mapping);
     });
   }
 
@@ -70,20 +71,18 @@ export default function ImportWizard() {
     setFile(chosen);
     setPreview(null);
     setResult(null);
-    setError("");
+    setError(null);
     if (chosen) runPreview(chosen, {});
   }
 
   function commit() {
     if (!file) return;
-    setError("");
+    setError(null);
     startTransition(async () => {
-      try {
-        setResult(await commitImport(buildForm(file, mapping)));
-        setPreview(null);
-      } catch (exception) {
-        setError(exception instanceof Error ? exception.message : "Could not import them.");
-      }
+      const committed = await commitImport(buildForm(file, mapping));
+      if (!committed.ok) return setError(committed.error);
+      setResult(committed.data);
+      setPreview(null);
     });
   }
 
@@ -92,7 +91,7 @@ export default function ImportWizard() {
     setPreview(null);
     setMapping({});
     setResult(null);
-    setError("");
+    setError(null);
     if (fileInput.current) fileInput.current.value = "";
   }
 
@@ -101,7 +100,8 @@ export default function ImportWizard() {
 
   return (
     <div className="stack">
-      {error && <p className="error">{error}</p>}
+      <InlineError error={error} />
+      <ErrorModal error={error} onClose={() => setError(null)} />
 
       {!result && (
         <section>

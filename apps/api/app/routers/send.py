@@ -11,13 +11,15 @@ import random
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, status
 from pydantic import BaseModel
 from sqlalchemy import select
 
 from outreach_core.scheduling import schedule_step
 
+from .. import errors
 from ..deps import CurrentUser, Db, SettingsDep
+from ..errors import AppError
 from ..models import Event, Message, Profile, ScheduleRow, Target
 from ..services.gmail import GmailAuthRevoked, GmailError
 from ..services.sending import send_one, window_for
@@ -37,7 +39,11 @@ async def _target_and_draft(session, user_id, target_id: uuid.UUID):
         select(Target).where(Target.id == target_id, Target.user_id == user_id)
     )
     if target is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "no such target")
+        raise AppError(
+            status.HTTP_404_NOT_FOUND,
+            errors.TARGET_NOT_FOUND,
+            "That contact is no longer on your list.",
+        )
 
     step = target.touches_sent + 1
     message = await session.scalar(
@@ -46,9 +52,10 @@ async def _target_and_draft(session, user_id, target_id: uuid.UUID):
         )
     )
     if message is None:
-        raise HTTPException(
+        raise AppError(
             status.HTTP_409_CONFLICT,
-            "There is no draft to send. Generate or write one first.",
+            errors.NO_DRAFT,
+            "There is no draft to send. Write one first, or have it written for you.",
         )
     return target, message, step
 
@@ -78,13 +85,13 @@ async def send_now(
         )
     except GmailAuthRevoked as exc:
         await session.commit()  # the disconnect is recorded by send_one
-        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+        raise AppError(status.HTTP_409_CONFLICT, errors.GMAIL_DISCONNECTED, str(exc)) from exc
     except GmailError as exc:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc)) from exc
+        raise AppError(status.HTTP_502_BAD_GATEWAY, errors.GMAIL_FAILED, str(exc)) from exc
 
     await session.commit()
     if not outcome.sent:
-        raise HTTPException(status.HTTP_409_CONFLICT, outcome.reason)
+        raise AppError(status.HTTP_409_CONFLICT, errors.SEND_BLOCKED, outcome.reason)
     return SendResult(sent=True, touches_sent=target.touches_sent)
 
 
@@ -97,7 +104,11 @@ async def schedule_send(
 
     profile = await session.scalar(select(Profile).where(Profile.user_id == user.id))
     if profile is None:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Fill in your profile first.")
+        raise AppError(
+            status.HTTP_409_CONFLICT,
+            errors.PROFILE_INCOMPLETE,
+            "Fill in your profile first - a send needs your sending window from it.",
+        )
 
     window = window_for(profile)
     due = schedule_step(datetime.now(timezone.utc), 0, window, random.Random())
@@ -141,7 +152,9 @@ async def cancel_schedule(target_id: uuid.UUID, user: CurrentUser, session: Db) 
             select(ScheduleRow).where(
                 ScheduleRow.target_id == target_id,
                 ScheduleRow.user_id == user.id,
-                ScheduleRow.state == "pending",
+                # A parked row is cancellable too - "I am not writing this one"
+                # is a perfectly good answer to a follow-up nagging in red.
+                ScheduleRow.state.in_(("pending", "needs_draft")),
             )
         )
     )

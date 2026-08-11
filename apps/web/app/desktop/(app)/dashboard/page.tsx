@@ -1,12 +1,13 @@
 import Link from "next/link";
 
+import FollowUps from "@/components/FollowUps";
 import Icon from "@/components/Icon";
 import LocalTime from "@/components/LocalTime";
 import PwaSetup from "@/components/PwaSetup";
 import ScheduledStat from "@/components/ScheduledStat";
 import { api } from "@/lib/api";
 import { requireAuth } from "@/lib/auth-guard";
-import type { Dashboard, SentByDay } from "@/lib/types";
+import type { Dashboard, ScheduledOut, SentByDay } from "@/lib/types";
 
 // A clock time has to be formatted in the browser - see LocalTime. `relative`
 // below is safe on the server because a difference in days is the same number
@@ -41,9 +42,12 @@ function sparkline(days: SentByDay[], width = 320, height = 72) {
 
 export default async function DashboardPage() {
   await requireAuth();
-  const [data, pushKey] = await Promise.all([
+  const [data, pushKey, followUps] = await Promise.all([
     api<Dashboard>("/v1/dashboard"),
     api<{ key: string }>("/v1/push/key").catch(() => ({ key: "" })),
+    // Already ranked by urgency server-side. A failure here must not take the
+    // dashboard down with it - the rest of this page is still worth showing.
+    api<ScheduledOut>("/v1/dashboard/scheduled").catch(() => ({ items: [] })),
   ]);
 
   const totalContacts = data.targets.length;
@@ -165,7 +169,11 @@ export default async function DashboardPage() {
         <ScheduledStat count={scheduled} />
       </div>
 
-      {/* Row 3: reply tracker */}
+      {/* Row 3: follow-ups. Above the reply tracker because this one asks for
+          something - a follow-up nobody writes never sends. */}
+      <FollowUps items={followUps.items} />
+
+      {/* Row 4: reply tracker */}
       <div className="dz-card">
         <h2 style={{ marginBottom: "0.75rem" }}>Reply tracker</h2>
         {data.replies.length === 0 ? (

@@ -396,9 +396,13 @@ async def stop_sequence(
     """End a sequence and cancel anything still queued for it."""
     target.status = status
     target.status_detail = detail[:500]
+    # `needs_draft` as well as `pending`: a parked row is still a scheduled
+    # touch, and someone who replied or opted out must not stay on a follow-up
+    # list because the row that would have sent to them was out of the queue.
     rows = await session.scalars(
         select(ScheduleRow).where(
-            ScheduleRow.target_id == target.id, ScheduleRow.state == "pending"
+            ScheduleRow.target_id == target.id,
+            ScheduleRow.state.in_(("pending", "needs_draft")),
         )
     )
     for row in rows:

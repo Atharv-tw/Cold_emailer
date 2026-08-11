@@ -28,7 +28,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from .db import SessionFactory, bind_user
 from .models import (
-    GmailWatch, GoogleToken, Message, ScheduleRow, Target, User, WorkerHeartbeat,
+    Event, GmailWatch, GoogleToken, Message, ScheduleRow, Target, User, WorkerHeartbeat,
 )
 from .services import calendar_sync, replies
 from .services.gmail import GmailAuthRevoked, GmailClient, GmailError
@@ -46,6 +46,17 @@ MAX_SENDS_PER_TICK = 20
 
 # Re-arm a watch well before it lapses rather than on the day.
 WATCH_RENEW_BEFORE = timedelta(days=2)
+
+# How long a due row may sit with nothing written for it before the worker
+# stops looking at it every two minutes and parks it as `needs_draft`.
+#
+# Time, not a retry count: `attempts` also climbs on the ordinary retryable
+# skips - outside the window, daily cap reached, too soon since the last send -
+# and an evening of those would park a row whose draft was written all along.
+# "Due an hour ago and still not written" is the actual condition, so it is the
+# one measured. Generous enough that someone queueing a follow-up and going to
+# write it is never caught by it.
+NEEDS_DRAFT_AFTER = timedelta(hours=1)
 
 # The sweeps. Every job here starts by asking "whose work is waiting?", which
 # is a question no bound session can answer and an unbound one answers with
@@ -134,8 +145,26 @@ async def tick(_ctx: dict) -> dict:
                     )
                 )
                 if message is None:
-                    # Nothing written yet. The dashboard surfaces this as
-                    # "due today"; it is not an error.
+                    # Nothing written yet. Not an error - a slot is allowed to
+                    # sit briefly ahead of the words that go in it.
+                    #
+                    # But a row nobody writes never sends, and left pending it
+                    # is re-read every two minutes forever while sorting to the
+                    # front of the sweep, which is ordered by due_at. Enough of
+                    # them and they crowd real work out of the limit. So after
+                    # an hour it is parked: out of the queue the worker scans,
+                    # into the list the dashboard shows in red.
+                    if datetime.now(timezone.utc) - schedule.due_at > NEEDS_DRAFT_AFTER:
+                        schedule.state = "needs_draft"
+                        session.add(
+                            Event(
+                                user_id=user_id,
+                                target_id=schedule.target_id,
+                                type="needs_draft",
+                                detail=f"touch {schedule.step} was due and nothing is written",
+                            )
+                        )
+                        await session.commit()
                     skipped += 1
                     continue
 

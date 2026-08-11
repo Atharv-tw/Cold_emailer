@@ -43,7 +43,7 @@ describe("ImportWizard", () => {
   });
 
   it("shows a verdict for each row after a file is chosen", async () => {
-    previewImport.mockResolvedValue(PREVIEW);
+    previewImport.mockResolvedValue({ ok: true, data: PREVIEW });
     render(<ImportWizard />);
 
     await userEvent.upload(screen.getByLabelText("Choose a CSV or Excel file"), csv());
@@ -55,12 +55,15 @@ describe("ImportWizard", () => {
   });
 
   it("only offers to import the rows that pass, and reports the result", async () => {
-    previewImport.mockResolvedValue(PREVIEW);
+    previewImport.mockResolvedValue({ ok: true, data: PREVIEW });
     commitImport.mockResolvedValue({
-      created: 1,
-      skipped: 1,
-      skipped_reasons: { invalid: 1 },
-      summary: PREVIEW.summary,
+      ok: true,
+      data: {
+        created: 1,
+        skipped: 1,
+        skipped_reasons: { invalid: 1 },
+        summary: PREVIEW.summary,
+      },
     });
     render(<ImportWizard />);
 

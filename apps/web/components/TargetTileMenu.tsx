@@ -4,7 +4,9 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { deleteTarget, updateTarget } from "@/app/desktop/(app)/dashboard/actions";
+import { ErrorModal, InlineError } from "@/components/ActionError";
 import Modal from "@/components/Modal";
+import type { ActionError } from "@/lib/result";
 import type { Target } from "@/lib/types";
 
 /**
@@ -57,7 +59,7 @@ export default function TargetTileMenu({ target }: { target: Target }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<ActionError | null>(null);
   const [pending, startTransition] = useTransition();
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -88,28 +90,22 @@ export default function TargetTileMenu({ target }: { target: Target }) {
   }
 
   function onSave() {
-    setError("");
+    setError(null);
     startTransition(async () => {
-      try {
-        await updateTarget(target.id, form);
-        setEditing(false);
-        router.refresh();
-      } catch (exception) {
-        setError(exception instanceof Error ? exception.message : "Could not save.");
-      }
+      const result = await updateTarget(target.id, form);
+      if (!result.ok) return setError(result.error);
+      setEditing(false);
+      router.refresh();
     });
   }
 
   function onDelete() {
-    setError("");
+    setError(null);
     startTransition(async () => {
-      try {
-        await deleteTarget(target.id);
-        setConfirming(false);
-        router.refresh();
-      } catch (exception) {
-        setError(exception instanceof Error ? exception.message : "Could not delete.");
-      }
+      const result = await deleteTarget(target.id);
+      if (!result.ok) return setError(result.error);
+      setConfirming(false);
+      router.refresh();
     });
   }
 
@@ -159,6 +155,8 @@ export default function TargetTileMenu({ target }: { target: Target }) {
           </button>
         </div>
       )}
+
+      <ErrorModal error={error} onClose={() => setError(null)} />
 
       <Modal open={editing} onClose={() => setEditing(false)} title="Edit contact">
         <div className="flex flex-col gap-3">
@@ -216,7 +214,7 @@ export default function TargetTileMenu({ target }: { target: Target }) {
             <textarea rows={3} value={form.hook} onChange={field("hook")} />
           </label>
 
-          {error && <p className="error">{error}</p>}
+          <InlineError error={error} />
 
           <div className="flex gap-2">
             <button type="button" className="accent" disabled={pending} onClick={onSave}>
@@ -246,7 +244,7 @@ export default function TargetTileMenu({ target }: { target: Target }) {
             page instead.
           </p>
 
-          {error && <p className="error">{error}</p>}
+          <InlineError error={error} />
 
           <div className="flex gap-2">
             <button type="button" className="danger" disabled={pending} onClick={onDelete}>

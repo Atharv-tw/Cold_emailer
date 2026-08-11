@@ -16,6 +16,15 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    /**
+     * The API's stable name for this refusal - "profile_incomplete",
+     * "duplicate_target" - or "" when it did not send one.
+     *
+     * Screens that do more than print the message branch on this rather than
+     * on the wording, which is the part that gets rewritten. See
+     * `apps/api/app/errors.py` for the list.
+     */
+    readonly code: string = "",
   ) {
     super(message);
   }
@@ -33,14 +42,27 @@ async function apiToken(): Promise<string | undefined> {
 }
 
 /**
- * Turn the API's `detail` into something a person can read.
+ * Turn the API's `detail` into something a person can read, plus its code.
  *
- * Our own errors are strings. FastAPI's own validation failures are not - the
- * detail is a list of `{loc, msg}` objects, and interpolating that yields
- * "[object Object]", which names neither the field nor the problem. Those are
- * the only two things worth reporting.
+ * Three shapes arrive here. A refusal the UI has to recognise is an object -
+ * `{code, message}`, from `app/errors.py`. A plainer one is just a string.
+ * FastAPI's own validation failures are neither: the detail is a list of
+ * `{loc, msg}` objects, and interpolating that yields "[object Object]",
+ * which names neither the field nor the problem - the only two things worth
+ * reporting.
  */
-function describe(detail: unknown): string | undefined {
+function describe(detail: unknown): { message?: string; code: string } {
+  if (detail && typeof detail === "object" && !Array.isArray(detail)) {
+    const { code, message } = detail as { code?: unknown; message?: unknown };
+    return {
+      message: typeof message === "string" && message ? message : undefined,
+      code: typeof code === "string" ? code : "",
+    };
+  }
+  return { message: describeText(detail), code: "" };
+}
+
+function describeText(detail: unknown): string | undefined {
   if (typeof detail === "string") return detail || undefined;
   if (!Array.isArray(detail)) return undefined;
 
@@ -100,13 +122,16 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   });
 
   if (!response.ok) {
-    let detail = response.statusText;
+    let message = response.statusText;
+    let code = "";
     try {
-      detail = describe(((await response.json()) as { detail?: unknown }).detail) ?? detail;
+      const described = describe(((await response.json()) as { detail?: unknown }).detail);
+      message = described.message ?? message;
+      code = described.code;
     } catch {
       // A non-JSON error body is still an error; the status carries it.
     }
-    throw new ApiError(response.status, detail);
+    throw new ApiError(response.status, message, code);
   }
 
   return response.status === 204 ? (undefined as T) : ((await response.json()) as T);

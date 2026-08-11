@@ -33,7 +33,7 @@ function PaymentCard({ payment }: { payment: AdminPayment }) {
     const result = await reviewPayment(payment.id, approve, note);
     setBusy(false);
     if (result.ok) setResolved(result.data.status);
-    else setError(result.error);
+    else setError(result.error.message || "That did not go through.");
   }
 
   return (
@@ -117,7 +117,7 @@ function UserRow({ user }: { user: AdminUserRow }) {
     const result = await setUserPlan(user.id, !isPaid);
     setBusy(false);
     if (result.ok) setIsPaid(result.data.is_paid);
-    else setError(result.error);
+    else setError(result.error.message || "That did not go through.");
   }
 
   return (
