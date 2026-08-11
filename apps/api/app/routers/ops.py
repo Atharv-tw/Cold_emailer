@@ -26,6 +26,13 @@ router = APIRouter(prefix="/v1/ops", tags=["ops"])
 # Tick runs every two minutes; no heartbeat in ten means the worker is down.
 WORKER_STALE_AFTER = timedelta(minutes=10)
 
+# How long an armed watch may deliver nothing before that is worth reporting.
+# Generous, because silence is only evidence when mail was expected: a quiet
+# mailbox produces no notifications and is not broken. Two days is long enough
+# that ordinary quiet does not trip it and short enough to catch a subscription
+# pointed at the wrong host before a whole sequence runs its course.
+PUSH_SILENT_AFTER = timedelta(days=2)
+
 
 class JobBeat(BaseModel):
     job: str
@@ -48,6 +55,11 @@ class OpsOut(BaseModel):
     watch_last_renewed: datetime | None = None
     watch_expires_at: datetime | None = None
     watch_healthy: bool
+    last_push_at: datetime | None = None
+    # A watch Gmail accepted, delivering nothing. `watch_healthy` cannot see
+    # this: it goes green the moment `watch` returns and stays green for a week
+    # whether or not one notification ever arrives.
+    push_silent: bool = False
     reconcile_last_read: datetime | None = None
     follow_ups_due: int
     failed_sends: list[FailedSend]
@@ -63,6 +75,7 @@ async def ops(user: CurrentUser, session: Db) -> OpsOut:
 
     watch = await session.scalar(select(GmailWatch).where(GmailWatch.user_id == user.id))
     watch_expires = watch.expires_at if watch else None
+    last_push = watch.last_push_at if watch else None
 
     reconcile_last = await session.scalar(
         select(func.max(Target.thread_checked_at)).where(Target.user_id == user.id)
@@ -107,6 +120,12 @@ async def ops(user: CurrentUser, session: Db) -> OpsOut:
         watch_last_renewed=watch.last_checked_at if watch else None,
         watch_expires_at=watch_expires,
         watch_healthy=watch_expires is not None and watch_expires > now,
+        last_push_at=last_push,
+        push_silent=(
+            watch_expires is not None
+            and watch_expires > now
+            and (last_push is None or (now - last_push) > PUSH_SILENT_AFTER)
+        ),
         reconcile_last_read=reconcile_last,
         follow_ups_due=follow_ups_due,
         failed_sends=failed_sends,
