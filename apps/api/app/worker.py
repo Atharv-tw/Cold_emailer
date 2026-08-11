@@ -23,7 +23,7 @@ from datetime import datetime, timedelta, timezone
 
 from arq import cron
 from arq.connections import RedisSettings
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from .db import SessionFactory, bind_user
@@ -46,6 +46,22 @@ MAX_SENDS_PER_TICK = 20
 
 # Re-arm a watch well before it lapses rather than on the day.
 WATCH_RENEW_BEFORE = timedelta(days=2)
+
+# The sweeps. Every job here starts by asking "whose work is waiting?", which
+# is a question no bound session can answer and an unbound one answers with
+# silence - RLS fails closed, so `select(ScheduleRow)` on an unbound session
+# returns zero rows rather than erroring. These are the SECURITY DEFINER
+# functions added in 0012; they return ids, and reading anything behind an id
+# still means binding to its owner first.
+_DUE_ROWS = text("SELECT id, user_id FROM due_schedule_rows(:limit)")
+_CONNECTED_USERS = text("SELECT user_id FROM connected_user_ids()")
+_PENDING_COUNTS = text("SELECT user_id, pending FROM pending_counts_by_user(:horizon)")
+
+
+async def _connected_user_ids() -> list:
+    """Every account still connected to Google, ids only."""
+    async with SessionFactory() as session:
+        return list(await session.scalars(_CONNECTED_USERS))
 
 
 async def _client_for(session, user: User) -> GmailClient:
@@ -79,34 +95,28 @@ async def _mark_disconnected(session, user: User, reason: str) -> None:
 
 async def tick(_ctx: dict) -> dict:
     """Send everything that is due."""
-    now = datetime.now(timezone.utc)
+    # "Due" is decided by the database's clock inside `due_schedule_rows`, so
+    # there is no local `now` here; each send stamps its own.
     rng = random.Random()
     sent = skipped = 0
 
     async with SessionFactory() as session:
-        due = list(
-            await session.scalars(
-                select(ScheduleRow)
-                .where(ScheduleRow.state == "pending", ScheduleRow.due_at <= now)
-                .order_by(ScheduleRow.due_at)
-                .limit(MAX_SENDS_PER_TICK * 4)
-            )
-        )
+        due = list((await session.execute(_DUE_ROWS, {"limit": MAX_SENDS_PER_TICK * 4})).all())
 
-    for row in due:
+    for row_id, user_id in due:
         if sent >= MAX_SENDS_PER_TICK:
             break
         async with SessionFactory() as session:
             # Bound per row: the worker acts for one user at a time, so the
             # same row-level security that protects a request protects a job.
-            await bind_user(session, row.user_id)
+            await bind_user(session, user_id)
             try:
-                schedule = await session.get(ScheduleRow, row.id)
+                schedule = await session.get(ScheduleRow, row_id)
                 if schedule is None or schedule.state != "pending":
                     continue
 
-                user = await session.get(User, row.user_id)
-                target = await session.get(Target, row.target_id)
+                user = await session.get(User, user_id)
+                target = await session.get(Target, schedule.target_id)
                 if user is None or target is None:
                     schedule.state = "cancelled"
                     await session.commit()
@@ -148,13 +158,13 @@ async def tick(_ctx: dict) -> dict:
                     skipped += 1
                 await session.commit()
             except GmailAuthRevoked as exc:
-                user = await session.get(User, row.user_id)
+                user = await session.get(User, user_id)
                 if user is not None:
                     await _mark_disconnected(session, user, str(exc))
                     await session.commit()
             except Exception:  # noqa: BLE001 - one bad row must not stop the tick
                 await session.rollback()
-                logger.exception("tick failed for schedule row %s", row.id)
+                logger.exception("tick failed for schedule row %s", row_id)
 
     await _beat("tick", f"sent {sent}, skipped {skipped}")
     return {"sent": sent, "skipped": skipped}
@@ -171,14 +181,13 @@ async def renew_watches(_ctx: dict) -> dict:
         return {"skipped": "no pubsub topic configured"}
 
     renewed = failed = 0
-    async with SessionFactory() as session:
-        users = list(await session.scalars(select(User).where(User.disconnected_at.is_(None))))
+    user_ids = await _connected_user_ids()
 
-    for user in users:
+    for user_id in user_ids:
         async with SessionFactory() as session:
-            await bind_user(session, user.id)
+            await bind_user(session, user_id)
             try:
-                current = await session.get(User, user.id)
+                current = await session.get(User, user_id)
                 if current is None:
                     continue
                 gmail = await _client_for(session, current)
@@ -196,13 +205,13 @@ async def renew_watches(_ctx: dict) -> dict:
                 await session.commit()
                 renewed += 1
             except GmailAuthRevoked as exc:
-                current = await session.get(User, user.id)
+                current = await session.get(User, user_id)
                 if current is not None:
                     await _mark_disconnected(session, current, str(exc))
                     await session.commit()
                 failed += 1
             except GmailError:
-                logger.exception("watch renewal failed for user %s", user.id)
+                logger.exception("watch renewal failed for user %s", user_id)
                 failed += 1
 
     await _beat("renew_watches", f"renewed {renewed}, failed {failed}")
@@ -212,14 +221,13 @@ async def renew_watches(_ctx: dict) -> dict:
 async def reconcile(_ctx: dict) -> dict:
     """Safety net: read threads directly for anything push may have missed."""
     checked = stopped = 0
-    async with SessionFactory() as session:
-        users = list(await session.scalars(select(User).where(User.disconnected_at.is_(None))))
+    user_ids = await _connected_user_ids()
 
-    for user in users:
+    for user_id in user_ids:
         async with SessionFactory() as session:
-            await bind_user(session, user.id)
+            await bind_user(session, user_id)
             try:
-                current = await session.get(User, user.id)
+                current = await session.get(User, user_id)
                 if current is None:
                     continue
                 gmail = await _client_for(session, current)
@@ -228,13 +236,13 @@ async def reconcile(_ctx: dict) -> dict:
                 checked += 1
                 stopped += sum(1 for outcome in outcomes if outcome.stopped)
             except GmailAuthRevoked as exc:
-                current = await session.get(User, user.id)
+                current = await session.get(User, user_id)
                 if current is not None:
                     await _mark_disconnected(session, current, str(exc))
                     await session.commit()
             except Exception:  # noqa: BLE001
                 await session.rollback()
-                logger.exception("reconcile failed for user %s", user.id)
+                logger.exception("reconcile failed for user %s", user_id)
 
     await _beat("reconcile", f"checked {checked}, stopped {stopped}")
     return {"users_checked": checked, "sequences_stopped": stopped}
@@ -251,22 +259,11 @@ async def notify_due(_ctx: dict) -> dict:
     notified = 0
 
     async with SessionFactory() as session:
-        rows = list(
-            await session.scalars(
-                select(ScheduleRow).where(
-                    ScheduleRow.state == "pending", ScheduleRow.due_at <= horizon
-                )
-            )
-        )
+        by_user = (await session.execute(_PENDING_COUNTS, {"horizon": horizon})).all()
 
-    by_user: dict = {}
-    for row in rows:
-        by_user.setdefault(row.user_id, []).append(row)
-
-    for user_id, due in by_user.items():
+    for user_id, count in by_user:
         async with SessionFactory() as session:
             await bind_user(session, user_id)
-            count = len(due)
             await notify(
                 session,
                 user_id=user_id,
@@ -291,14 +288,13 @@ async def sync_calendars(_ctx: dict) -> dict:
     no send and simply retries next time.
     """
     synced = skipped = 0
-    async with SessionFactory() as session:
-        users = list(await session.scalars(select(User).where(User.disconnected_at.is_(None))))
+    user_ids = await _connected_user_ids()
 
-    for user in users:
+    for user_id in user_ids:
         async with SessionFactory() as session:
-            await bind_user(session, user.id)
+            await bind_user(session, user_id)
             try:
-                current = await session.get(User, user.id)
+                current = await session.get(User, user_id)
                 if current is None:
                     continue
                 token = await session.get(GoogleToken, current.id)
@@ -309,13 +305,13 @@ async def sync_calendars(_ctx: dict) -> dict:
                 await session.commit()
                 synced += 1
             except GmailAuthRevoked as exc:
-                current = await session.get(User, user.id)
+                current = await session.get(User, user_id)
                 if current is not None:
                     await _mark_disconnected(session, current, str(exc))
                     await session.commit()
             except Exception:  # noqa: BLE001 - one user's calendar must not stop the rest
                 await session.rollback()
-                logger.exception("calendar sync failed for user %s", user.id)
+                logger.exception("calendar sync failed for user %s", user_id)
 
     await _beat("sync_calendars", f"synced {synced}, skipped {skipped}")
     return {"users_synced": synced, "users_skipped": skipped}

@@ -192,6 +192,77 @@ class TestRowLevelSecurity(unittest.TestCase):
         self.cursor.execute("SELECT find_user_id_by_google_sub('sub-a')")
         self.assertEqual(self.cursor.fetchone()[0], ALICE)
 
+    # ------------------------------------------------- the worker's sweeps
+    #
+    # The worker cannot bind before it knows whose work is waiting, and an
+    # unbound session sees nothing - which is how every job came to run
+    # perfectly and do nothing. These are the 0012 functions that answer the
+    # "whose?" question; each returns ids, so the row behind one still has to
+    # be read on a bound session.
+
+    def _overdue_row(self, user_id: uuid.UUID) -> uuid.UUID:
+        self.bind(user_id)
+        self.cursor.execute("SELECT id FROM targets WHERE user_id = %s", (user_id,))
+        target_id = self.cursor.fetchone()[0]
+        row_id = uuid.uuid4()
+        self.cursor.execute(
+            "INSERT INTO schedule (id, user_id, target_id, step, due_at, state) "
+            "VALUES (%s, %s, %s, 1, now() - interval '1 hour', 'pending')",
+            (row_id, user_id, target_id),
+        )
+        return row_id
+
+    def test_an_unbound_session_cannot_see_a_due_row_directly(self):
+        """The regression itself: this is what `tick` used to run."""
+        self._overdue_row(ALICE)
+        self.bind(None)
+        self.cursor.execute(
+            "SELECT count(*) FROM schedule WHERE state = 'pending' AND due_at <= now()"
+        )
+        self.assertEqual(self.cursor.fetchone()[0], 0)
+
+    def test_the_due_sweep_finds_rows_without_a_bound_user(self):
+        row_id = self._overdue_row(ALICE)
+        self.bind(None)
+        self.cursor.execute("SELECT id, user_id FROM due_schedule_rows(100)")
+        self.assertIn((row_id, ALICE), self.cursor.fetchall())
+
+    def test_the_due_sweep_returns_ids_not_rows(self):
+        """Knowing a send is due must not reveal who it is to."""
+        self._overdue_row(ALICE)
+        self.bind(BOB)
+        self.cursor.execute("SELECT id FROM due_schedule_rows(100)")
+        due = [row[0] for row in self.cursor.fetchall()]
+        self.assertTrue(due)
+        # Bob learns an id and stops there: the row stays behind the policy.
+        self.cursor.execute("SELECT count(*) FROM schedule WHERE id = ANY(%s)", (due,))
+        self.assertEqual(self.cursor.fetchone()[0], 0)
+
+    def test_the_user_sweep_finds_connected_accounts(self):
+        self.bind(None)
+        self.cursor.execute("SELECT user_id FROM connected_user_ids()")
+        found = {row[0] for row in self.cursor.fetchall()}
+        self.assertTrue({ALICE, BOB} <= found)
+
+    def test_the_user_sweep_skips_disconnected_accounts(self):
+        self.bind(ALICE)
+        self.cursor.execute("UPDATE users SET disconnected_at = now() WHERE id = %s", (ALICE,))
+        self.bind(None)
+        self.cursor.execute("SELECT user_id FROM connected_user_ids()")
+        found = {row[0] for row in self.cursor.fetchall()}
+        self.assertNotIn(ALICE, found)
+        self.assertIn(BOB, found)
+
+    def test_the_pending_count_sweep_groups_by_user(self):
+        self._overdue_row(ALICE)
+        self.bind(None)
+        self.cursor.execute(
+            "SELECT pending FROM pending_counts_by_user(now() + interval '12 hours') "
+            "WHERE user_id = %s",
+            (ALICE,),
+        )
+        self.assertEqual(self.cursor.fetchone()[0], 1)
+
     def test_the_application_cannot_drop_its_own_policies(self):
         import psycopg
 
