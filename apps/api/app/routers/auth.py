@@ -18,7 +18,7 @@ from sqlalchemy import delete, select, text
 from ..crypto import encrypt
 from ..db import SessionFactory, bind_user
 from ..deps import CurrentUser, Db, SettingsDep
-from ..models import GoogleToken, Profile, User
+from ..models import GmailWatch, GoogleToken, Profile, User
 from ..security import COOKIE_NAME, issue_session
 from ..settings import Settings
 from ..services.google_oauth import (
@@ -31,6 +31,49 @@ from ..services.google_oauth import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1/auth", tags=["auth"])
+
+
+async def _arm_watch(session, user: User, settings: Settings) -> None:
+    """Register Gmail push for a freshly connected account.
+
+    `renew_watches` in the worker runs at 03:00, and it was the only caller of
+    `watch` anywhere - so an account that connected at any other hour had no
+    push subscription at all until the next morning. Reply detection fell back
+    to the reconcile sweep for up to seventeen hours, on the exact day a new
+    user is most likely to be watching for it to work.
+
+    Skipped when a live watch already exists, so the ordinary case - signing in
+    again on a connected account - costs nothing. Errors are logged and
+    swallowed: sign-in must not fail because Pub/Sub is misconfigured, and the
+    daily job is still there to catch up.
+    """
+    if not settings.gmail_pubsub_topic:
+        return
+
+    now = datetime.now(timezone.utc)
+    watch = await session.get(GmailWatch, user.id)
+    if watch is not None and watch.expires_at is not None and watch.expires_at > now:
+        return
+
+    from ..services.gmail import GmailClient, GmailError
+    from ..services.sending import access_token_for
+
+    try:
+        gmail = GmailClient(await access_token_for(session, user, settings))
+        result = await gmail.watch(settings.gmail_pubsub_topic)
+    except GmailError:
+        logger.exception("could not arm gmail watch for user %s", user.id)
+        return
+
+    if watch is None:
+        watch = GmailWatch(user_id=user.id)
+        session.add(watch)
+    watch.history_id = int(result.get("historyId", 0)) or watch.history_id
+    expiration = result.get("expiration")
+    if expiration:
+        watch.expires_at = datetime.fromtimestamp(int(expiration) / 1000, tz=timezone.utc)
+    watch.last_checked_at = now
+    await session.commit()
 
 
 class GoogleSignIn(BaseModel):
@@ -163,6 +206,9 @@ async def sign_in_with_google(
         token_row = await session.scalar(select(GoogleToken).where(GoogleToken.user_id == user.id))
         profile = await session.scalar(select(Profile).where(Profile.user_id == user.id))
         await session.commit()
+
+        if token_row is not None:
+            await _arm_watch(session, user, settings)
 
         token, expires = issue_session(
             user.id, settings.session_secret, settings.session_ttl_minutes
