@@ -282,15 +282,14 @@ export default function ProfileForm({ profile, disclosure, user }: Props) {
   const [experience, setExperience] = useState<Experience[]>(profile.experience);
 
   // The window the worker sends inside. An empty sending_window means the
-  // profile has never had one set, and the API's defaults are UTC 09:00-17:00
-  // - which is why an unset window puts an Indian user's mail out at 10pm.
+  // profile has never had one set, and the API's defaults are Asia/Kolkata 09:00-17:00
   const savedWindow = (profile.sending_window ?? {}) as {
     timezone?: string;
     start?: string;
     end?: string;
     days?: string[];
   };
-  const [timezone, setTimezone] = useState(savedWindow.timezone || "UTC");
+  const [timezone, setTimezone] = useState(savedWindow.timezone || "Asia/Kolkata");
   const [windowStart, setWindowStart] = useState(savedWindow.start || "09:00");
   const [windowEnd, setWindowEnd] = useState(savedWindow.end || "17:00");
   const [sendDays, setSendDays] = useState<string[]>(
