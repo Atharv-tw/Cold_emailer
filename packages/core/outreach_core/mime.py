@@ -18,6 +18,7 @@ import base64
 from collections.abc import Mapping
 from dataclasses import dataclass
 from email.message import EmailMessage
+from email.policy import default as default_policy
 from email.utils import formataddr, formatdate
 
 # Which profile link may appear in the signature, in order of preference. One
@@ -129,7 +130,7 @@ def build_message(
     the next touch. Setting one here and trusting it would break threading the
     moment Gmail rewrote it.
     """
-    msg = EmailMessage()
+    msg = EmailMessage(policy=default_policy.clone(max_line_length=0))
     msg["From"] = formataddr((sender.from_name, sender.email))
     msg["To"] = out.to_email
     msg["Subject"] = out.subject
