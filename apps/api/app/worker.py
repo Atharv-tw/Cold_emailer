@@ -8,8 +8,9 @@ Four of them, and the reason each exists:
   delivering silently. This job existing is the entire reason push can be
   relied on at all.
 - **reconcile** - reads threads directly for anything push may have missed.
-  Slow, so it runs rarely. It is the reason a broken push pipeline cannot
-  cause an email to someone who already replied.
+  Slow, so it runs rarely. It keeps the stored reply status roughly current;
+  what actually prevents emailing someone who replied is the thread read in
+  `send_one`, because that one runs at the moment of the send.
 - **notify_due** - web push for follow-ups coming due today.
 
 Not serverless-shaped, which is why the API needs a long-running host.
