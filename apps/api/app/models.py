@@ -112,6 +112,15 @@ class GmailWatch(Base, TimestampMixin):
     history_id: Mapped[int | None] = mapped_column(BigInteger)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # When a notification last actually arrived. `expires_at` and
+    # `last_checked_at` only record that Gmail accepted our `watch` call, which
+    # says nothing about whether Pub/Sub can reach us: a subscription pointing
+    # at a stale host or a route that no longer exists leaves both of those
+    # looking perfectly healthy while every notification is dropped. That is
+    # exactly how push stayed broken through a hosting migration, unnoticed,
+    # until someone tested a reply by hand. This is the column that would have
+    # said so.
+    last_push_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 # --------------------------------------------------------------------- profile
@@ -366,6 +375,52 @@ class Target(Base, TimestampMixin):
     )
 
 
+class TargetReply(Base, TimestampMixin):
+    """The inbound message that ended a sequence, kept in full.
+
+    Its own table rather than columns on `Target`, for one reason: a reply body
+    is unbounded - a long answer quoting the whole thread runs to tens of
+    kilobytes - and `select(Target)` fetches every column. Widening `targets`
+    would put that text on the reconcile sweep, the target list, and the
+    pre-send check, none of which ever read it. Here it is read only when
+    someone opens the target that has one.
+
+    Primary-keyed on `target_id`, which enforces one reply per target at the
+    schema level. That matches the invariant, not just current behaviour:
+    replying is terminal, and `may_schedule_touch` only lets a target start a
+    new cycle when it is *silent*, so a target that answered can never come
+    back around and answer twice.
+
+    The body is stored because it has already been fetched and parsed - the
+    classifier reads it to decide the verdict, then had been discarding it. Not
+    a snippet: truncation would save nothing measurable here and would make the
+    stored copy useless for the one thing it is for, which is reading what the
+    person actually said.
+    """
+
+    __tablename__ = "target_replies"
+
+    target_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("targets.id", ondelete="CASCADE"), primary_key=True
+    )
+    # Denormalised from `targets` because the row-level security predicate is
+    # `user_id = current_setting('app.user_id')` and every user-scoped table
+    # carries its own copy. Reaching through the foreign key instead would need
+    # a policy with a subquery on a table that has its own policy.
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    from_email: Mapped[str] = mapped_column(Text, default="")
+    subject: Mapped[str] = mapped_column(Text, default="")
+    body: Mapped[str] = mapped_column(Text, default="")
+    gmail_message_id: Mapped[str] = mapped_column(String(64), default="")
+    # When they sent it, from the message's own Date header - not when we
+    # noticed. Those can differ by hours when push is down and the reconcile
+    # sweep is what found it, and "replied 6 hours ago" is the true statement.
+    received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class Message(Base, TimestampMixin):
     __tablename__ = "messages"
 
@@ -565,6 +620,6 @@ class PaymentRequest(Base, TimestampMixin):
 # they belong to no user at all.
 USER_SCOPED_TABLES = [
     "google_tokens", "gmail_watch", "profiles", "profile_projects",
-    "profile_experience", "resumes", "targets", "messages", "schedule",
-    "events", "suppression", "push_subs",
+    "profile_experience", "resumes", "targets", "target_replies", "messages",
+    "schedule", "events", "suppression", "push_subs",
 ]
