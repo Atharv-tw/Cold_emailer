@@ -4,8 +4,9 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import DraftEditor from "@/components/DraftEditor";
 import LocalTime from "@/components/LocalTime";
+import ReplyCard from "@/components/ReplyCard";
 import { api } from "@/lib/api";
-import type { Draft, EmailTemplate, Target, TargetDetail } from "@/lib/types";
+import type { Draft, EmailTemplate, Reply, Target, TargetDetail } from "@/lib/types";
 
 const VERIFICATION_TONE: Record<string, string> = {
   deliverable: "ok",
@@ -23,12 +24,15 @@ export default async function TargetPage({
   if (!session?.apiUser) redirect("/");
 
   const { id } = await params;
-  const [target, detail, draft, templates] = await Promise.all([
+  const [target, detail, draft, templates, reply] = await Promise.all([
     api<Target>(`/v1/targets/${id}`),
     api<TargetDetail>(`/v1/targets/${id}/timeline`),
     // No draft yet is the normal state for a new target, not an error.
     api<Draft>(`/v1/targets/${id}/draft`).catch(() => null),
     api<EmailTemplate[]>("/v1/templates"),
+    // Absent for every target nobody answered, which is most of them. This
+    // request is also what marks the reply read.
+    api<Reply>(`/v1/targets/${id}/reply`).catch(() => null),
   ]);
 
   const verification = target.verification ?? {};
@@ -42,6 +46,8 @@ export default async function TargetPage({
         {target.company && ` · ${target.company}`}
         {target.role && ` · ${target.role}`}
       </p>
+
+      {reply && <ReplyCard reply={reply} />}
 
       {verification.status && verification.status !== "deliverable" && (
         <div className="note">
