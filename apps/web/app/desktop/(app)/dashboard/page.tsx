@@ -42,6 +42,7 @@ export default async function DashboardPage() {
 
   const totalContacts = data.targets.length;
   const replied = data.counts.replied || 0;
+  const unreadReplies = data.counts.unread_replies || 0;
   const scheduled = data.counts.scheduled || 0;
   const reachedCount = data.targets.filter((t) => t.touches_sent > 0).length;
   const reachedPercent = totalContacts > 0 ? Math.round((reachedCount / totalContacts) * 100) : 0;
@@ -76,7 +77,9 @@ export default async function DashboardPage() {
           </div>
           <div className="stat-value">{replied}</div>
           <div className="stat-trend" style={{ color: "rgba(10,10,10,0.65)" }}>
-            People who wrote back
+            {unreadReplies > 0
+              ? `${unreadReplies} you haven't read`
+              : "People who wrote back"}
           </div>
         </div>
 
@@ -138,7 +141,26 @@ export default async function DashboardPage() {
                   <Icon name="mail" size={16} />
                 </div>
                 <div className="list-content">
-                  <div className="list-title">{reply.name || "Someone"}</div>
+                  <div className="list-title">
+                    {reply.name || "Someone"}
+                    {/* A dot rather than bold text: the row is a link, and
+                        weight changes shift the layout as they are read. */}
+                    {reply.unread && (
+                      <span
+                        aria-label="unread"
+                        title="You have not opened this reply yet"
+                        style={{
+                          display: "inline-block",
+                          width: "7px",
+                          height: "7px",
+                          borderRadius: "50%",
+                          background: "var(--accent)",
+                          marginLeft: "0.5rem",
+                          verticalAlign: "middle",
+                        }}
+                      />
+                    )}
+                  </div>
                   <div className="list-desc">{reply.company || "—"}</div>
                 </div>
                 <div style={{ fontSize: "11px", color: "var(--muted)" }}>
