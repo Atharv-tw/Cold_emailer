@@ -138,7 +138,7 @@ class Profile(Base, TimestampMixin):
     education: Mapped[str] = mapped_column(Text, default="")
     availability: Mapped[str] = mapped_column(Text, default="")
 
-    timezone: Mapped[str] = mapped_column(String(64), default="UTC")
+    timezone: Mapped[str] = mapped_column(String(64), default="Asia/Kolkata")
     sending_window: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
 
     # The server's ceiling for this user. There is no UI that raises it.
