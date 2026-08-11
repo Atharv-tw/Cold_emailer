@@ -161,10 +161,14 @@ export default function DraftEditor({
           className="secondary"
           disabled={pending || !hasGeminiKey}
           title={hasGeminiKey ? undefined : "Add your Gemini API key in Settings first"}
-          onClick={() =>
+          onClick={() => {
+            // Outside `run`, and deliberately. Everything inside it happens in
+            // a transition, and React holds a transition's updates until the
+            // whole thing settles - so a flag set in there paints when the
+            // work is already over, which is no use to anyone waiting.
+            setStatus("");
+            setWriting(true);
             run(async () => {
-              setStatus("");
-              setWriting(true);
               try {
                 const draft = need(
                   await generateDraft(target.id, instruction, templateKey, geminiKey),
@@ -177,8 +181,8 @@ export default function DraftEditor({
               } finally {
                 setWriting(false);
               }
-            })
-          }
+            });
+          }}
         >
           {writing ? "Writing…" : initial ? "Write it again" : "Write it for me"}
         </button>
@@ -192,6 +196,16 @@ export default function DraftEditor({
               "still going — Gemini can take a few seconds",
             ]}
           />
+        )}
+        {/* Every run is a fresh draft, and the model is not consistent between
+            them. Saying so turns a bad draft from "this tool writes badly"
+            into "press it again", which is the actual fix - and it covers the
+            writing that dies part-way, which looks like the same button. */}
+        {hasGeminiKey && !writing && (
+          <p className="muted" style={{ fontSize: "12px", marginTop: "0.35rem" }}>
+            Each run writes a fresh draft. If this one reads wrong, or the writing
+            failed, press it again before rewriting it by hand.
+          </p>
         )}
         {!hasGeminiKey && (
           <p className="muted" style={{ fontSize: "12px", marginTop: "0.25rem" }}>
