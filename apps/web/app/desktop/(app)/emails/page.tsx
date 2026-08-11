@@ -62,7 +62,7 @@ export default async function EmailsPage() {
           <p>Emails you send will show up here.</p>
         </div>
       ) : (
-        <div className="dz-card mx-auto w-full max-w-4xl gap-2">
+        <div className="dz-card w-full gap-2">
           {messages.map((message) => {
             const tone = statusOf(message);
             return (
