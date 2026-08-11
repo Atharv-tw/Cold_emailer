@@ -11,6 +11,7 @@ from __future__ import annotations
 import base64
 import binascii
 import json
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
 from pydantic import BaseModel
@@ -70,8 +71,14 @@ async def gmail_push(
                 watch = GmailWatch(user_id=user.id)
                 session.add(watch)
             watch.history_id = int(history_id)
+            watch.last_push_at = datetime.now(timezone.utc)
             await session.commit()
             return
+
+        # Stamped before the work below, and kept even when that work fails:
+        # the question this answers is whether Pub/Sub can reach us at all,
+        # which a Gmail error downstream does not change.
+        watch.last_push_at = datetime.now(timezone.utc)
 
         try:
             gmail = GmailClient(await access_token_for(session, user, settings))
@@ -79,10 +86,12 @@ async def gmail_push(
                 session, user=user, gmail=gmail, start_history_id=start
             )
         except GmailAuthRevoked:
+            await session.commit()  # keep last_push_at; push itself worked
             return
         except GmailError:
             # Leave the stored history id alone so the next notification -
             # or the reconcile sweep - picks the change up.
+            await session.commit()
             return
 
         if new_history_id is None:
