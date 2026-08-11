@@ -73,6 +73,13 @@ export type SessionUser = {
 
 export type AvatarOut = { avatar_url: string };
 
+export type PoolPage = {
+  items: PoolContact[];
+  // Matching the current filters, ignoring limit and offset - so the header
+  // can say how many exist rather than how many were fetched.
+  total: number;
+};
+
 export type Billing = {
   // False when the deployment has no UPI id, price or object storage set.
   available: boolean;

@@ -16,11 +16,11 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, HTTPException, Query, status
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 
 from ..deps import CurrentUser, Db, SettingsDep
 from ..models import Contact, DeadAddress, Event, Target
-from ..schemas import PoolContactOut, TargetOut
+from ..schemas import PoolContactOut, PoolPageOut, TargetOut
 from .targets import _out, ensure_addable
 
 router = APIRouter(prefix="/v1/pool", tags=["pool"])
@@ -115,7 +115,7 @@ def pool_query(
     return query.order_by(Contact.company, Contact.name)
 
 
-@router.get("", response_model=list[PoolContactOut])
+@router.get("", response_model=PoolPageOut)
 async def list_pool(
     user: CurrentUser,
     session: Db,
@@ -124,14 +124,21 @@ async def list_pool(
     q: str | None = Query(None, description="search over name, company and role"),
     limit: int = Query(60, ge=1, le=200),
     offset: int = Query(0, ge=0),
-) -> list[PoolContactOut]:
+) -> PoolPageOut:
     await require_pool_access(user)
-    rows = await session.scalars(
-        pool_query(user.id, target_type=target_type, company_type=company_type, q=q)
-        .limit(limit)
-        .offset(offset)
+
+    query = pool_query(user.id, target_type=target_type, company_type=company_type, q=q)
+
+    # Counted from the same query object, so the total can never describe a
+    # different set of filters than the rows beside it - the failure being a
+    # page that says "499 people" while showing the 60 that matched something
+    # narrower.
+    total = int(
+        await session.scalar(select(func.count()).select_from(query.subquery())) or 0
     )
-    return [_contact_out(row) for row in rows]
+
+    rows = await session.scalars(query.limit(limit).offset(offset))
+    return PoolPageOut(items=[_contact_out(row) for row in rows], total=total)
 
 
 @router.post("/{contact_id}/add", response_model=TargetOut, status_code=status.HTTP_201_CREATED)

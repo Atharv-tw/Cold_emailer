@@ -5,8 +5,12 @@ import { auth } from "@/auth";
 import PoolAddButton from "@/components/PoolAddButton";
 import PoolFilters from "@/components/PoolFilters";
 import PoolLocked from "@/components/PoolLocked";
+import PoolPager from "@/components/PoolPager";
 import { api } from "@/lib/api";
-import type { Billing, PoolContact, SessionUser } from "@/lib/types";
+import type { Billing, PoolPage, SessionUser } from "@/lib/types";
+
+// Matches the API's own default.
+const PAGE_SIZE = 60;
 
 type Search = Record<string, string | string[] | undefined>;
 
@@ -46,8 +50,11 @@ export default async function PoolPage({
     const value = one(params[key]).trim();
     if (value) query.set(key, value);
   }
+  const offset = Math.max(0, Number.parseInt(one(params.offset), 10) || 0);
+  if (offset) query.set("offset", String(offset));
   const suffix = query.toString();
-  const contacts = await api<PoolContact[]>(`/v1/pool${suffix ? `?${suffix}` : ""}`);
+  const page = await api<PoolPage>(`/v1/pool${suffix ? `?${suffix}` : ""}`);
+  const contacts = page.items;
 
   const active: Record<string, string> = {};
   for (const key of FACETS) active[key] = one(params[key]);
@@ -62,8 +69,7 @@ export default async function PoolPage({
       <PoolFilters active={active} />
 
       <p className="muted">
-        {contacts.length} {contacts.length === 1 ? "person" : "people"} you have not
-        contacted yet.
+        {page.total} {page.total === 1 ? "person" : "people"} you have not contacted yet.
       </p>
 
       {contacts.length === 0 ? (
@@ -96,6 +102,8 @@ export default async function PoolPage({
           ))}
         </ul>
       )}
+
+      <PoolPager total={page.total} limit={PAGE_SIZE} offset={offset} />
     </main>
   );
 }

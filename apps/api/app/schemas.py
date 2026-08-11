@@ -233,6 +233,20 @@ class PoolContactOut(BaseModel):
     verification: dict[str, Any]
 
 
+class PoolPageOut(BaseModel):
+    """One page of the pool, and how many there are in total.
+
+    The total is separate because it cannot be inferred from the page: a
+    listing that returned 60 rows tells you nothing about whether 60 or 4,000
+    matched. Without it the browse page can only describe what it was handed,
+    which reads as "60 people" to somebody looking at a list of 499.
+    """
+
+    items: list[PoolContactOut]
+    # Matching the filters, ignoring limit and offset.
+    total: int
+
+
 class ImportField(BaseModel):
     """One column an uploaded file may feed, named as the form asks it."""
 

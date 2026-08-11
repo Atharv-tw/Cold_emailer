@@ -4,9 +4,14 @@ import Avatar from "@/components/Avatar";
 import PoolAddButton from "@/components/PoolAddButton";
 import PoolFilters from "@/components/PoolFilters";
 import PoolLocked from "@/components/PoolLocked";
+import PoolPager from "@/components/PoolPager";
 import { api } from "@/lib/api";
 import { requireAuth } from "@/lib/auth-guard";
-import type { Billing, PoolContact, SessionUser } from "@/lib/types";
+import type { Billing, PoolPage, SessionUser } from "@/lib/types";
+
+// Matches the API's own default. Kept here so the pager can work out which
+// page it is on without the API having to tell it twice.
+const PAGE_SIZE = 60;
 
 type Search = Record<string, string | string[] | undefined>;
 
@@ -50,8 +55,11 @@ export default async function PoolPage({
     const value = one(params[key]).trim();
     if (value) query.set(key, value);
   }
+  const offset = Math.max(0, Number.parseInt(one(params.offset), 10) || 0);
+  if (offset) query.set("offset", String(offset));
   const suffix = query.toString();
-  const contacts = await api<PoolContact[]>(`/v1/pool${suffix ? `?${suffix}` : ""}`);
+  const page = await api<PoolPage>(`/v1/pool${suffix ? `?${suffix}` : ""}`);
+  const contacts = page.items;
 
   const active: Record<string, string> = {};
   for (const key of FACETS) active[key] = one(params[key]);
@@ -62,8 +70,8 @@ export default async function PoolPage({
         <div>
           <h1>Contact pool</h1>
           <p>
-            {contacts.length} {contacts.length === 1 ? "person" : "people"} you have not
-            contacted yet
+            {page.total} {page.total === 1 ? "person" : "people"} you have not contacted
+            yet
           </p>
         </div>
         <div className="header-actions">
@@ -89,6 +97,8 @@ export default async function PoolPage({
           </p>
         </div>
       ) : (
+        <>
+        <PoolPager total={page.total} limit={PAGE_SIZE} offset={offset} />
         <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">
           {contacts.map((contact) => (
             <div key={contact.id} className="dz-card gap-3">
@@ -156,6 +166,8 @@ export default async function PoolPage({
             </div>
           ))}
         </div>
+        <PoolPager total={page.total} limit={PAGE_SIZE} offset={offset} />
+        </>
       )}
     </>
   );
