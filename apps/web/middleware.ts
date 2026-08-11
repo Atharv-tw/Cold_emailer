@@ -33,8 +33,15 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico, sitemap.xml, robots.txt, manifest.webmanifest (metadata files)
-     * - sw.js, *.png (public assets)
+     * - sw.js, and anything with a static asset extension
+     *
+     * The extension list covers svg and ico as well as png. It used to be png
+     * alone, which meant /icon.svg and /logo.svg were rewritten to
+     * /desktop/icon.svg and 404'd - so the favicon silently did not exist. Any
+     * static file served from public/ or by Next's metadata conventions has to
+     * be matched here, because a rewrite turns a missing extension into a
+     * missing file rather than an error anyone notices.
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|manifest.webmanifest|sw.js|.*\\.png).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|manifest.webmanifest|sw.js|.*\\.(?:png|svg|ico|webmanifest|xml|txt)).*)',
   ],
 };

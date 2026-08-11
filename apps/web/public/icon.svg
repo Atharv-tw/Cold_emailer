@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Outreach">
+  <title>Outreach</title>
+  <!-- Browser tab / favicon. Next's app/icon.svg convention picks this up and
+       emits the link tag, so it does not need registering in layout.tsx.
+
+       Same disc and same ring as public/logo-mark.svg, but the O is scaled up
+       from a 10px to a 20px outer diameter. In the header the mark sits at
+       32px next to a wordmark, so a small O reads as a considered logo; in a
+       16px tab strip with no wordmark beside it, that same O collapses into a
+       dot. The stroke stays at 22% of the O's diameter either way, which is
+       what keeps the two looking like the same logo. -->
+  <circle cx="16" cy="16" r="16" fill="#c6ef4e"/>
+  <circle cx="16" cy="16" r="7.8" fill="none" stroke="#000000" stroke-width="4.4"/>
+</svg>
