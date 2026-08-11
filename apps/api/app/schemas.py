@@ -199,6 +199,27 @@ class TargetOut(BaseModel):
     last_touch_at: Any = None
     can_send: bool
     blocked_reason: str
+    # Deep link into the user's own Gmail. Empty until the first touch creates
+    # a thread. Deliberately not accompanied by the reply body: this model is
+    # also the list response, and a reply body on every row is exactly the
+    # payload the separate `/reply` endpoint exists to keep out of it.
+    gmail_thread_url: str = ""
+
+
+class ReplyOut(BaseModel):
+    """The inbound message that ended a sequence, in full.
+
+    Its own endpoint rather than a field on `TargetOut`, so that listing two
+    hundred targets does not carry two hundred reply bodies.
+    """
+
+    target_id: str
+    from_email: str
+    subject: str
+    body: str
+    received_at: Any = None
+    read_at: Any = None
+    gmail_thread_url: str = ""
 
 
 class ResumeOut(BaseModel):
