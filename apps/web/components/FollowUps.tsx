@@ -28,10 +28,17 @@ const WHEN: Intl.DateTimeFormatOptions = {
   minute: "2-digit",
 };
 
-export default function FollowUps({ items }: { items: ScheduledItem[] }) {
+export default function FollowUps({
+  items,
+  className = "",
+}: {
+  items: ScheduledItem[];
+  /** Grid placement from the caller; the card styling stays here. */
+  className?: string;
+}) {
   if (items.length === 0) {
     return (
-      <div className="dz-card">
+      <div className={`dz-card ${className}`.trim()}>
         <h2 style={{ marginBottom: "0.75rem" }}>Follow-ups</h2>
         <p className="muted">
           Nothing scheduled. A follow-up is queued automatically each time an
@@ -44,7 +51,7 @@ export default function FollowUps({ items }: { items: ScheduledItem[] }) {
   const needsWriting = items.filter((item) => item.needs_draft).length;
 
   return (
-    <div className="dz-card">
+    <div className={`dz-card ${className}`.trim()}>
       <div className="mb-3 flex items-center justify-between">
         <h2>Follow-ups</h2>
         {needsWriting > 0 && (

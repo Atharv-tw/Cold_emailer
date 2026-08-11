@@ -9,22 +9,12 @@ import { api } from "@/lib/api";
 import { requireAuth } from "@/lib/auth-guard";
 import type { Dashboard, ScheduledOut, SentByDay } from "@/lib/types";
 
-// A clock time has to be formatted in the browser - see LocalTime. `relative`
-// below is safe on the server because a difference in days is the same number
-// in every timezone.
+// A clock time has to be formatted in the browser - see LocalTime.
 const WHEN: Intl.DateTimeFormatOptions = {
   weekday: "short",
   hour: "2-digit",
   minute: "2-digit",
 };
-
-function relative(iso: string | null): string {
-  if (!iso) return "never";
-  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-  if (days <= 0) return "today";
-  if (days === 1) return "yesterday";
-  return `${days}d ago`;
-}
 
 function sparkline(days: SentByDay[], width = 320, height = 72) {
   const values = days.map((d) => d.count);
@@ -57,11 +47,6 @@ export default async function DashboardPage() {
   const reachedPercent = totalContacts > 0 ? Math.round((reachedCount / totalContacts) * 100) : 0;
   const sentThisPeriod = data.sent_by_day.reduce((sum, d) => sum + d.count, 0);
   const { linePath, areaPath } = sparkline(data.sent_by_day);
-
-  const recentlyContacted = data.targets
-    .filter((t) => t.last_touch_at)
-    .sort((a, b) => (b.last_touch_at ?? "").localeCompare(a.last_touch_at ?? ""))
-    .slice(0, 6);
 
   return (
     <>
@@ -131,49 +116,16 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Row 2: recently contacted / scheduled */}
+      {/* Row 2: follow-ups / scheduled. This slot used to hold "Recently
+          contacted", which was a record of work already done - pleasant, but
+          it asked nothing. What goes here now is the list that does: a
+          follow-up nobody writes never sends. */}
       <div className="grid grid-cols-4 gap-5">
-        <div className="dz-card col-span-3">
-          <div className="mb-3 flex items-center justify-between">
-            <h2>Recently contacted</h2>
-            <Link
-              href="/targets"
-              className="flex items-center gap-1 rounded-full bg-paper px-3 py-1.5 text-xs font-semibold text-fg transition-colors hover:bg-cream"
-            >
-              View all
-              <Icon name="arrow-right" size={13} strokeWidth={2} />
-            </Link>
-          </div>
-          {recentlyContacted.length === 0 ? (
-            <p className="muted">Nobody yet — send your first email to see it here.</p>
-          ) : (
-            <div className="flex flex-col">
-              {recentlyContacted.map((target) => (
-                <Link key={target.id} href={`/targets/${target.id}`} className="dz-list-item">
-                  <div className="list-icon">
-                    {(target.name || target.email).charAt(0).toUpperCase()}
-                  </div>
-                  <div className="list-content">
-                    <div className="list-title">{target.name || target.email}</div>
-                    <div className="list-desc">{target.company || "—"}</div>
-                  </div>
-                  <div style={{ fontSize: "11px", color: "var(--muted)" }}>
-                    {relative(target.last_touch_at)}
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-
+        <FollowUps items={followUps.items} className="col-span-3" />
         <ScheduledStat count={scheduled} />
       </div>
 
-      {/* Row 3: follow-ups. Above the reply tracker because this one asks for
-          something - a follow-up nobody writes never sends. */}
-      <FollowUps items={followUps.items} />
-
-      {/* Row 4: reply tracker */}
+      {/* Row 3: reply tracker */}
       <div className="dz-card">
         <h2 style={{ marginBottom: "0.75rem" }}>Reply tracker</h2>
         {data.replies.length === 0 ? (
