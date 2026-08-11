@@ -177,6 +177,17 @@ export type Target = {
   last_touch_at: string | null;
   can_send: boolean;
   blocked_reason: string;
+  gmail_thread_url: string;
+};
+
+export type Reply = {
+  target_id: string;
+  from_email: string;
+  subject: string;
+  body: string;
+  received_at: string | null;
+  read_at: string | null;
+  gmail_thread_url: string;
 };
 
 export type Draft = {
@@ -227,7 +238,13 @@ export type TargetSummary = {
 
 export type SentByDay = { date: string; count: number };
 
-export type ReplyItem = { target_id: string; name: string; company: string; at: string };
+export type ReplyItem = {
+  target_id: string;
+  name: string;
+  company: string;
+  at: string;
+  unread: boolean;
+};
 
 export type Dashboard = {
   counts: Record<string, number>;
