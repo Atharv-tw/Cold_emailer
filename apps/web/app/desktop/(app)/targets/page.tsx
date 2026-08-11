@@ -62,7 +62,7 @@ export default async function TargetsPage({
         </div>
         <div className="header-actions">
           <Link href="/pool">
-            <button style={{ borderRadius: "2rem", padding: "0.5rem 1.25rem", fontWeight: "600" }}>
+            <button className="secondary" style={{ borderRadius: "2rem", padding: "0.5rem 1.25rem", fontWeight: "600" }}>
               Browse pool
             </button>
           </Link>

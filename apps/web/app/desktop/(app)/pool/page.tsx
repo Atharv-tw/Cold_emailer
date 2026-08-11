@@ -76,7 +76,7 @@ export default async function PoolPage({
         </div>
         <div className="header-actions">
           <Link href="/targets">
-            <button style={{ borderRadius: "2rem", padding: "0.5rem 1.25rem", fontWeight: "600" }}>
+            <button className="secondary" style={{ borderRadius: "2rem", padding: "0.5rem 1.25rem", fontWeight: "600" }}>
               My contacts
             </button>
           </Link>
