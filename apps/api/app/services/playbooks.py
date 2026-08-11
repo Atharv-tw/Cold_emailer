@@ -78,9 +78,26 @@ COMPANY_CONTEXT: dict[str, str] = {
     "other": "",
 }
 
+FIRST_TOUCH_RULES = """\
+This is the first email to this person. They have never heard from you.
+
+After the greeting, write the body as exactly three paragraphs separated by
+blank lines, and nothing else:
+1. Intro - who the sender is in one line, and the specific reason they are
+   writing to this person rather than to anyone else. Two sentences at most.
+2. The work - one project or piece of experience named from the sender's
+   profile, and concretely why it is relevant to this recipient. This is the
+   substantial paragraph, and still no more than three sentences.
+3. The ask - what the sender is actually asking for, stated plainly and small
+   enough to answer in one line. It must follow from the paragraph above
+   rather than arriving out of nowhere. Two sentences at most.
+
+Three paragraphs, in that order. Nothing after the ask."""
+
 FOLLOW_UP_RULES = """\
 This is a follow-up in a thread they have not answered. It must be much
-shorter than the first email - two or three sentences. Do not repeat the
+shorter than the first email - two or three sentences, and the three-paragraph
+shape of a first email does not apply. Do not repeat the
 pitch, do not re-introduce yourself, and do not imply they were rude to ignore
 you; they were busy. Add one new thing or ask one narrower question, then
 stop. If there is nothing new to say, say less.
@@ -89,7 +106,8 @@ Never use the words "just following up", "bumping this", or "circling back"."""
 LAST_TOUCH_RULES = """\
 This is the last email in this thread; nothing further will be sent whatever
 happens. Say so plainly and without reproach - it reads as courteous, and it
-is also true. Keep it to two sentences and leave the door open."""
+is also true. Keep it to two sentences and leave the door open. The
+three-paragraph shape of a first email does not apply here."""
 
 
 def playbook_for(target_type: str) -> str:
@@ -107,7 +125,7 @@ def company_context_for(company_type: str) -> str:
 def touch_rules(step: int, max_touches: int) -> str:
     """Guidance that depends on where in the sequence this email sits."""
     if step <= 1:
-        return "This is the first email to this person. They have never heard from you."
+        return FIRST_TOUCH_RULES
     if step >= max_touches:
         return LAST_TOUCH_RULES
     return FOLLOW_UP_RULES
