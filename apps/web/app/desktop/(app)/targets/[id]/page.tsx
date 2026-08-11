@@ -3,10 +3,11 @@ import Link from "next/link";
 import DraftEditor from "@/components/DraftEditor";
 import Icon from "@/components/Icon";
 import LocalTime from "@/components/LocalTime";
+import ReplyCard from "@/components/ReplyCard";
 import ThreadPanel from "@/components/ThreadPanel";
 import { api } from "@/lib/api";
 import { requireAuth } from "@/lib/auth-guard";
-import type { Draft, EmailTemplate, Target, TargetDetail } from "@/lib/types";
+import type { Draft, EmailTemplate, Reply, Target, TargetDetail } from "@/lib/types";
 
 const VERIFICATION_TONE: Record<string, string> = {
   deliverable: "badge-completed",
@@ -46,11 +47,15 @@ export default async function TargetPage({
   await requireAuth();
 
   const { id } = await params;
-  const [target, detail, draft, templates] = await Promise.all([
+  const [target, detail, draft, templates, reply] = await Promise.all([
     api<Target>(`/v1/targets/${id}`),
     api<TargetDetail>(`/v1/targets/${id}/timeline`),
     api<Draft>(`/v1/targets/${id}/draft`).catch(() => null),
     api<EmailTemplate[]>("/v1/templates"),
+    // 404 on every target nobody answered, which is most of them. Opening this
+    // page is also what marks the reply read - there is no state where someone
+    // has the reply on screen and has not seen it.
+    api<Reply>(`/v1/targets/${id}/reply`).catch(() => null),
   ]);
 
   const verification = target.verification ?? {};
@@ -78,6 +83,12 @@ export default async function TargetPage({
 
       <div className="dashboard-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+          {/* Above everything, including the compose box. Once someone has
+              answered, what they said is the only thing on this page worth
+              reading first - and the sequence is over, so the draft below it
+              is no longer actionable anyway. */}
+          {reply && <ReplyCard reply={reply} />}
+
           {/* "Not configured" is a fact about the deployment, not about this
               address. Warning on every target for a feature that was never
               switched on trains people to ignore the banner that matters. */}
