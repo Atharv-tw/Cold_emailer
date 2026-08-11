@@ -15,9 +15,13 @@ security stays switched on and the session is bound to the subject instead of
 the operator. No connection here has BYPASSRLS. The consequence is that a bug
 in this file leaks one account, not all of them.
 
-`users` and `payment_requests` are readable directly because neither carries an
-RLS policy - the first has never been user-scoped, and the second cannot be and
-still be reviewable. See `PaymentRequest`'s docstring for what that costs.
+`users` **is** under RLS, with a self-only policy from 0001 - an earlier version
+of this file claimed otherwise and was wrong, which is why the payments list
+came back empty while the claim sat in the table: `list_payments` joins to
+`users`, and the join dropped every row the operator did not own. 0011 adds
+permissive SELECT and UPDATE policies gated on `app.is_admin`, which the
+`AdminUser` dependency sets after proving the role. `payment_requests` genuinely
+carries no policy - see its docstring for what that costs.
 """
 
 from __future__ import annotations
@@ -183,7 +187,10 @@ async def list_payments(
     """Claims waiting on a decision, newest first.
 
     Joined to `users` so the panel can show who is asking without a request per
-    row - there is no RLS on either table, so this is one ordinary query.
+    row. That join is what made this return nothing before 0011: `users` is
+    under RLS, and a session bound to the operator matched only their own
+    account, so every claim by anybody else was dropped by the join rather than
+    refused. It works now because `AdminUser` elevates the session first.
     """
     query = (
         select(PaymentRequest, User)

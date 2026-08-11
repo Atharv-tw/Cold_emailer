@@ -36,6 +36,13 @@ SessionFactory = async_sessionmaker(engine, expire_on_commit=False, class_=Async
 _BOUND_USER = "app.user_id"
 _ANNOUNCE = text("SELECT set_config('app.user_id', :uid, true)")
 
+# Set only by the AdminUser dependency, only after `is_admin` has been read off
+# the caller's own row. It widens the `users` policies added in 0011 so an
+# operator can see accounts other than their own; every other session leaves it
+# unset, and `current_setting(..., true)` is NULL then, which fails closed.
+_BOUND_ADMIN = "app.is_admin"
+_ANNOUNCE_ADMIN = text("SELECT set_config('app.is_admin', :flag, true)")
+
 
 @event.listens_for(SyncSession, "after_begin")
 def _announce_on_every_transaction(session, transaction, connection) -> None:
@@ -60,6 +67,13 @@ def _announce_on_every_transaction(session, transaction, connection) -> None:
         return  # never bound: an unbound session must keep seeing nothing
     connection.execute(_ANNOUNCE, {"uid": uid})
 
+    # Same reasoning, same failure. An admin route that commits and then reads
+    # - `set_plan` refreshes the row it just wrote - would otherwise carry on
+    # over a connection that had forgotten the caller is an operator, and the
+    # row it just updated would read back as absent.
+    if session.info.get(_BOUND_ADMIN):
+        connection.execute(_ANNOUNCE_ADMIN, {"flag": "on"})
+
 
 async def bind_user(session: AsyncSession, user_id: uuid.UUID | None) -> None:
     """Tell Postgres who this session is acting for.
@@ -75,6 +89,21 @@ async def bind_user(session: AsyncSession, user_id: uuid.UUID | None) -> None:
     # the transaction, the listener already has an id to announce.
     session.sync_session.info[_BOUND_USER] = uid
     await session.execute(_ANNOUNCE, {"uid": uid})
+
+
+async def elevate_admin(session: AsyncSession) -> None:
+    """Let this session read and update accounts other than its own.
+
+    Called by the `AdminUser` dependency and by nothing else, and only after
+    `is_admin` has been read off the caller's own row - which is itself only
+    readable under the self policy, so the flag can never be claimed by a
+    request that did not already prove it.
+
+    Recorded in `session.info` for the same reason the user id is: SET LOCAL
+    dies with its transaction, and admin routes commit and then read.
+    """
+    session.sync_session.info[_BOUND_ADMIN] = True
+    await session.execute(_ANNOUNCE_ADMIN, {"flag": "on"})
 
 
 async def get_session() -> AsyncIterator[AsyncSession]:
