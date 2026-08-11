@@ -38,7 +38,23 @@ SIGNATURE_LINK_KEYS = (
 )
 
 
-def signature(name: str, links: Mapping[str, str]) -> str:
+def _ends_with_name(body: str, name: str) -> bool:
+    """True when the body's last non-empty line is already the sender's name.
+
+    Only the last line, and it has to match the whole line. A body that
+    mentions the sender's name in a sentence is not signed off, and appending
+    the block after it is correct.
+    """
+    name = name.strip().casefold()
+    if not name:
+        return False
+    for line in reversed((body or "").splitlines()):
+        if line.strip():
+            return line.strip().rstrip(",").casefold() == name
+    return False
+
+
+def signature(name: str, links: Mapping[str, str], body: str = "") -> str:
     """The sender's own block, appended after the body at send time.
 
     Deliberately not something the model writes. The generation prompt allows
@@ -46,13 +62,25 @@ def signature(name: str, links: Mapping[str, str]) -> str:
     reading as a link dump - if the signature were part of what was generated,
     the model would spend that single allowance on a profile page.
 
+    "Deliberately" was doing a lot of work there: the prompt did not actually
+    forbid a sign-off until it was told to, and a model that writes one puts
+    the sender's name in a first touch twice, three lines apart. So `body` is
+    consulted, and the name is dropped when the body already ends with it.
+
+    Note what this does *not* do: it never edits the body. Deleting a trailing
+    "Best,\\nAtharv Tiwari" would mean a regex silently removing the user's own
+    text, and the words a sign-off is made of are ordinary English that a real
+    closing sentence can end on. Skipping a line we were about to add is
+    reversible by reading the email; deleting a line the user wrote is not.
+
     No "--" delimiter: it is the RFC 3676 convention, but Gmail collapses what
     follows it behind an ellipsis, which hides the link this exists to show.
 
     Returns "" when there is nothing to say, so a profile with no name and no
     portfolio does not append a bare separator to every email.
     """
-    lines = [line for line in [name.strip()] if line]
+    signed = _ends_with_name(body, name)
+    lines = [line for line in [name.strip()] if line and not signed]
 
     # Keys are whatever the user typed on their profile, so match on case-folded
     # names rather than requiring them to have written "portfolio" exactly.

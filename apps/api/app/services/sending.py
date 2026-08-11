@@ -268,7 +268,13 @@ async def send_one(
     #
     # Appended here rather than stored on the draft, so editing a draft can
     # never leave a stale copy in the body and re-sending cannot append twice.
-    sig = signature(user.name or "", profile.links or {}) if message.step == 1 else ""
+    # The rendered body, not the stored draft: the name check has to see the
+    # text that is actually about to go out.
+    sig = (
+        signature(user.name or "", profile.links or {}, rendered.body)
+        if message.step == 1
+        else ""
+    )
 
     identity = SenderIdentity(email=user.email, from_name=user.name or user.email)
     outgoing = Outgoing(

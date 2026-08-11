@@ -10,6 +10,7 @@ import {
   scheduleSend,
   sendNow,
 } from "@/app/desktop/(app)/dashboard/actions";
+import QueuedNotice from "@/components/QueuedNotice";
 import { useGeminiKey } from "@/lib/useGeminiKey";
 import type { Draft, EmailTemplate, Target } from "@/lib/types";
 
@@ -175,15 +176,7 @@ export default function DraftEditor({
         </div>
       )}
 
-      {queuedFor && (
-        <div className="note">
-          <strong>Queued for {when(queuedFor)}.</strong>
-          <p className="muted">
-            Edit the text above and save, and that is what goes out — the time
-            only changes if you reschedule.
-          </p>
-        </div>
-      )}
+      {queuedFor && <QueuedNotice queuedFor={queuedFor} />}
 
       {status && <p className="ok">{status}</p>}
       {error && <p className="error">{error}</p>}
@@ -239,8 +232,15 @@ export default function DraftEditor({
             run(async () => {
               await saveDraft(target.id, subject, body);
               const result = await scheduleSend(target.id);
+              // Same honesty as the panel below: a due time in the past or the
+              // immediate present means "next tick", not that exact minute.
+              const at = result.scheduled_for;
               setStatus(
-                result.scheduled_for ? `Queued for ${when(result.scheduled_for)}.` : "Queued.",
+                !at
+                  ? "Queued."
+                  : new Date(at).getTime() <= Date.now()
+                    ? "Queued — going out in the next couple of minutes."
+                    : `Queued for ${when(at)}.`,
               );
               router.refresh();
             })

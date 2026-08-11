@@ -479,6 +479,49 @@ class TestSignature(unittest.TestCase):
         """Gmail hides what follows "--", which is exactly what this shows."""
         self.assertNotIn("--", signature("Dana", {"portfolio": "https://dana.dev"}))
 
+    # ------------------------------------------- a body that signed itself
+    #
+    # The prompt forbids a sign-off, and a model may write one anyway. On a
+    # first touch that put the sender's name in twice, three lines apart.
+
+    def test_name_is_skipped_when_the_body_already_signed_off(self):
+        body = "...does that fit?\n\nBest,\nDana"
+        self.assertEqual(
+            signature("Dana", {"portfolio": "https://dana.dev"}, body),
+            "\n\nPortfolio: https://dana.dev",
+        )
+
+    def test_nothing_is_appended_when_signed_off_and_no_link(self):
+        self.assertEqual(signature("Dana", {}, "...does that fit?\n\nBest,\nDana"), "")
+
+    def test_the_body_is_never_edited(self):
+        """The whole point of skipping rather than stripping."""
+        body = "...does that fit?\n\nBest,\nDana"
+        signature("Dana", {"portfolio": "https://dana.dev"}, body)
+        self.assertEqual(body, "...does that fit?\n\nBest,\nDana")
+
+    def test_a_name_inside_a_sentence_is_not_a_sign_off(self):
+        """Only a whole last line counts, or an ordinary mention loses the name."""
+        body = "I am Dana"
+        self.assertEqual(signature("Dana", {}, body), "\n\nDana")
+
+    def test_trailing_blank_lines_do_not_hide_the_sign_off(self):
+        body = "...does that fit?\n\nBest,\nDana\n\n  \n"
+        self.assertEqual(signature("Dana", {}, body), "")
+
+    def test_case_and_a_trailing_comma_still_match(self):
+        self.assertEqual(signature("Dana", {}, "...fit?\n\ndana,"), "")
+
+    def test_an_unsigned_body_is_unaffected(self):
+        body = "...does that fit?"
+        self.assertEqual(
+            signature("Dana", {"portfolio": "https://dana.dev"}, body),
+            "\n\nDana\nPortfolio: https://dana.dev",
+        )
+
+    def test_someone_elses_name_on_the_last_line_is_not_a_sign_off(self):
+        self.assertEqual(signature("Dana", {}, "...fit?\n\nSam"), "\n\nDana")
+
 
 # ----------------------------------------------------------- classification
 

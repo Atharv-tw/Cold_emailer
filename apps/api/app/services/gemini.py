@@ -60,6 +60,10 @@ Hard rules:
   than guessing.
 - The ask should be small and easy to say yes or no to, and should follow
   from the specific thing you just said, not be bolted on.
+- End on the ask. Do not write a closing, a sign-off, or the sender's name -
+  no "Best", "Thanks", "Regards", "Cheers", or anything in that shape. The
+  system appends the sender's name and one profile link after your body, so
+  anything you write there is the second copy.
 
 Return exactly this shape and nothing else:
 
