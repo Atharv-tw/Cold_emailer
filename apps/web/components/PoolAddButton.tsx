@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { ErrorModal, InlineError } from "@/components/ActionError";
@@ -23,6 +23,7 @@ import type { ActionError } from "@/lib/result";
  */
 export default function PoolAddButton({ contactId }: { contactId: string }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<ActionError | null>(null);
 
@@ -30,7 +31,10 @@ export default function PoolAddButton({ contactId }: { contactId: string }) {
     setError(null);
     startTransition(async () => {
       const result = await addFromPool(contactId);
-      if (result.ok) router.push(`/targets/${result.data.id}`);
+      if (result.ok) {
+        const prefix = pathname.startsWith("/mobile") ? "/mobile" : "";
+        router.push(`${prefix}/targets/${result.data.id}`);
+      }
       else setError(result.error);
     });
   }
