@@ -81,18 +81,14 @@ COMPANY_CONTEXT: dict[str, str] = {
 FIRST_TOUCH_RULES = """\
 This is the first email to this person. They have never heard from you.
 
-After the greeting, write the body as exactly three paragraphs separated by
-blank lines, and nothing else:
-1. Intro - who the sender is in one line, and the specific reason they are
-   writing to this person rather than to anyone else. Two sentences at most.
-2. The work - one project or piece of experience named from the sender's
-   profile, and concretely why it is relevant to this recipient. This is the
-   substantial paragraph, and still no more than three sentences.
-3. The ask - what the sender is actually asking for, stated plainly and small
-   enough to answer in one line. It must follow from the paragraph above
-   rather than arriving out of nowhere. Two sentences at most.
+After the greeting, three paragraphs and nothing else:
+1. Intro - their work, and a little about the sender.
+2. The work - one named project or piece of the sender's experience.
+3. The ask - what the sender wants.
 
-Three paragraphs, in that order. Nothing after the ask."""
+Two sentences per paragraph. Say the thing and stop; do not explain why it is
+relevant, do not justify, and do not stack clauses onto a sentence that was
+already finished."""
 
 FOLLOW_UP_RULES = """\
 This is a follow-up in a thread they have not answered. It must be much
