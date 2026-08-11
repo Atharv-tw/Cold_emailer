@@ -31,15 +31,51 @@ class FakeUser:
         self.is_admin = is_admin
 
 
+class FakeSession:
+    """Records whether the session was elevated, and nothing else."""
+
+    def __init__(self) -> None:
+        self.elevated = False
+        self.sync_session = self
+
+    def __setattr__(self, name, value):
+        object.__setattr__(self, name, value)
+
+    async def execute(self, *_args, **_kwargs):
+        self.elevated = True
+        return None
+
+    @property
+    def info(self) -> dict:
+        return self.__dict__.setdefault("_info", {})
+
+
 class TestAdminDependency(unittest.TestCase):
     def test_a_normal_account_is_refused(self):
+        session = FakeSession()
         with self.assertRaises(HTTPException) as caught:
-            asyncio.run(admin_user(FakeUser(is_admin=False)))
+            asyncio.run(admin_user(FakeUser(is_admin=False), session))
         self.assertEqual(caught.exception.status_code, 403)
 
-    def test_an_operator_passes_through(self):
+    def test_a_refused_account_never_elevates_the_session(self):
+        """The refusal has to happen before the elevation, not beside it.
+
+        `app.is_admin` widens the `users` policies added in 0011, so setting it
+        for a session that then goes on to serve an ordinary request would hand
+        that request every account on the platform.
+        """
+        session = FakeSession()
+        with self.assertRaises(HTTPException):
+            asyncio.run(admin_user(FakeUser(is_admin=False), session))
+        self.assertFalse(session.elevated)
+
+    def test_an_operator_passes_through_and_elevates(self):
         user = FakeUser(is_admin=True)
-        self.assertIs(asyncio.run(admin_user(user)), user)
+        session = FakeSession()
+        self.assertIs(asyncio.run(admin_user(user, session)), user)
+        # Without this the panel reads its own row and nothing else - which is
+        # not an error, just an empty list, which is how it went unnoticed.
+        self.assertTrue(session.elevated)
 
 
 class TestEveryAdminRouteIsGuarded(unittest.TestCase):

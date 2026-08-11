@@ -9,7 +9,7 @@ from fastapi import Cookie, Depends, Header, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .db import bind_user, get_session
+from .db import bind_user, elevate_admin, get_session
 from .models import User
 from .security import COOKIE_NAME, SessionError, read_session
 from .settings import Settings, get_settings
@@ -62,13 +62,23 @@ CurrentUserId = Annotated[uuid.UUID, Depends(current_user_id)]
 Db = Annotated[AsyncSession, Depends(db)]
 
 
-async def admin_user(user: Annotated[User, Depends(current_user)]) -> User:
+async def admin_user(
+    user: Annotated[User, Depends(current_user)],
+    session: Annotated[AsyncSession, Depends(db)],
+) -> User:
     """The operator, for routes that act across accounts.
 
-    `is_admin` is set by hand in SQL and by nothing else - no handler anywhere
-    accepts it in a payload - so this reads a column the request could not have
-    influenced. That is the whole guarantee: there is no path from "signed in"
-    to "privileged", and a bug in an admin route therefore cannot create one.
+    `is_admin` is set by hand in SQL and by nothing else - no handler accepts
+    it in a payload, and since 0011 a trigger refuses the write outright when
+    it comes from the application role. So this reads a column the request
+    could not have influenced: there is no path from "signed in" to
+    "privileged", and a bug in an admin route cannot create one.
+
+    Elevating the session is the second half. `users` is under RLS with a
+    self-only policy, so without this an operator's own session sees exactly
+    one account - their own - and every cross-account read comes back empty
+    rather than refused. The flag is set here, after the role has been proved,
+    and never anywhere else.
 
     403 rather than 404: hiding that the routes exist would only obscure them
     from someone already authenticated, and an honest refusal is easier to
@@ -76,6 +86,7 @@ async def admin_user(user: Annotated[User, Depends(current_user)]) -> User:
     """
     if not user.is_admin:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "not an admin")
+    await elevate_admin(session)
     return user
 
 
