@@ -9,7 +9,9 @@ once.
 
 Order matters: the checks that protect the recipient come before the ones
 that protect the sender's reputation, and the cheap ones come before the ones
-that cost a network call.
+that cost a network call - with one deliberate exception. Reading the thread
+costs a call and runs first anyway, because every check after it reads a status
+column that the read is what makes current.
 """
 
 from __future__ import annotations
@@ -149,6 +151,41 @@ async def send_one(
     if profile is None:
         return SendOutcome(False, "no profile")
     window = window_for(profile)
+
+    # 0. Refresh that state from Gmail before reading it.
+    #
+    #    `may_schedule_touch` below rejects a target that already replied, and
+    #    its docstring says it is re-run here precisely because state changes
+    #    between scheduling and sending. But it reads `target.status`, and
+    #    nothing on this path had ever made that column current - so the check
+    #    was only as good as the last time some other layer happened to look.
+    #    Both of those layers can be arbitrarily stale and silent about it:
+    #    push stops delivering when the watch lapses or the subscription is
+    #    misrouted, and reconcile is hours behind by design. Neither is tied to
+    #    the moment that matters.
+    #
+    #    So read the thread now. One `threads.get` per follow-up, and it is
+    #    what makes the guarantee in `replies` - that no push failure can
+    #    produce a send to someone who answered - actually true.
+    if target.gmail_thread_id:
+        from . import replies  # local: replies imports stop_sequence from here
+
+        client = gmail or GmailClient(await access_token_for(session, user, settings))
+        try:
+            await replies.process_thread(
+                session, user=user, target=target, gmail=client, now=now
+            )
+        except GmailAuthRevoked:
+            # Not ours to absorb: the caller disconnects the account on this.
+            raise
+        except GmailError as exc:
+            # Fail closed. An unreadable thread means the reply state is
+            # unknown, and sending into that unknown is the single outcome this
+            # function exists to prevent. The row stays pending and the next
+            # tick, two minutes out, asks again.
+            return SendOutcome(False, f"could not read thread: {exc}", retry=True)
+        # Reuse the client below rather than paying for a second token refresh.
+        gmail = client
 
     # 1. The recipient's own state. Checked first because it is the only one
     #    where sending anyway is not merely impolite but harmful.
