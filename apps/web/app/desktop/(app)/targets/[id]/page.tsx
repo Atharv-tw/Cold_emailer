@@ -23,6 +23,21 @@ const getTimelineIcon = (type: string): any => {
   return "info";
 };
 
+function EventDetailText({ text }: { text: string }) {
+  if (!text) return null;
+  const parts = text.split(/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:[+-]\d{2}:\d{2}|Z))/);
+  return (
+    <div className="list-desc">
+      {parts.map((part, i) => {
+        if (part.match(/^\d{4}-\d{2}-\d{2}T/)) {
+          return <LocalTime key={i} iso={part} />;
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </div>
+  );
+}
+
 export default async function TargetPage({
   params,
 }: {
@@ -112,7 +127,7 @@ export default async function TargetPage({
                   </div>
                   <div className="list-content">
                     <div className="list-title">{entry.type}</div>
-                    {entry.detail && <div className="list-desc">{entry.detail}</div>}
+                    {entry.detail && <EventDetailText text={entry.detail} />}
                   </div>
                   <div style={{ fontSize: "11px", color: "var(--muted)" }}>
                     <LocalTime iso={entry.at} />
