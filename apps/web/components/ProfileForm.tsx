@@ -13,6 +13,7 @@ import {
 } from "@/app/desktop/(app)/profile/actions";
 import Icon, { type IconName } from "@/components/Icon";
 import Modal from "@/components/Modal";
+import Working from "@/components/Working";
 import { useGeminiKey } from "@/lib/useGeminiKey";
 import type { Disclosure, Profile, Project, Experience, SessionUser } from "@/lib/types";
 
@@ -358,7 +359,9 @@ export default function ProfileForm({ profile, disclosure, user }: Props) {
       return;
     }
     setReading(true);
-    setStatus("Reading your resume…");
+    // No status text while it runs - the indicator below the button is the
+    // status, and the bar at the bottom prefixes anything here with a tick.
+    setStatus("");
     try {
       const form = new FormData();
       form.append("file", resumeFile);
@@ -593,6 +596,18 @@ export default function ProfileForm({ profile, disclosure, user }: Props) {
                 >
                   {reading ? "Reading…" : "Read it"}
                 </button>
+
+                {reading && (
+                  <Working
+                    tone="dark"
+                    label="Reading your resume"
+                    hints={[
+                      "pulling the text out of the file",
+                      "finding your projects and experience",
+                      "this one can take a little while",
+                    ]}
+                  />
+                )}
               </div>
             )}
 
@@ -1038,7 +1053,9 @@ export default function ProfileForm({ profile, disclosure, user }: Props) {
           <div className="sticky bottom-4 z-30">
             <div className="flex items-center gap-3 rounded-full bg-surface p-2 pl-5 shadow-[var(--shadow-float)] ring-1 ring-line">
               <span className="min-w-0 flex-1 truncate text-[13px]">
-                {error ? (
+                {reading ? (
+                  <Working label="Reading your resume" />
+                ) : error ? (
                   <span className="error">{error}</span>
                 ) : status ? (
                   <span className="ok flex items-center gap-1.5">
