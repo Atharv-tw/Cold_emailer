@@ -18,12 +18,21 @@ import type { Target } from "@/lib/types";
  * it. The pool row itself does not change - it stays available to everyone
  * else, minus this user, who is filtered out of the listing from now on.
  */
-export async function addFromPool(contactId: string): Promise<Target> {
-  const target = await api<Target>(`/v1/pool/${contactId}/add`, { method: "POST" });
-  // The listing hides anyone already on the list, and both the dashboard and
-  // the people page gained a row.
-  revalidatePath("/pool");
-  revalidatePath("/targets");
-  revalidatePath("/dashboard");
-  return target;
+export async function addFromPool(
+  contactId: string,
+): Promise<{ success: true; target: Target } | { success: false; error: string }> {
+  try {
+    const target = await api<Target>(`/v1/pool/${contactId}/add`, { method: "POST" });
+    // The listing hides anyone already on the list, and both the dashboard and
+    // the people page gained a row.
+    revalidatePath("/pool");
+    revalidatePath("/targets");
+    revalidatePath("/dashboard");
+    return { success: true, target };
+  } catch (cause) {
+    return {
+      success: false,
+      error: cause instanceof Error ? cause.message : "Could not add them.",
+    };
+  }
 }

@@ -26,11 +26,11 @@ export default function PoolAddButton({ contactId }: { contactId: string }) {
   function add() {
     setError("");
     startTransition(async () => {
-      try {
-        const target = await addFromPool(contactId);
-        router.push(`/targets/${target.id}`);
-      } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "Could not add them.");
+      const result = await addFromPool(contactId);
+      if (result.success) {
+        router.push(`/targets/${result.target.id}`);
+      } else {
+        setError(result.error);
       }
     });
   }
