@@ -187,10 +187,27 @@ class TestRowLevelSecurity(unittest.TestCase):
         self.assertEqual(self.cursor.fetchone()[0], 0)
 
     def test_sign_in_lookup_works_without_a_bound_user(self):
-        """The one deliberate exemption, and it returns an id and nothing else."""
+        """A deliberate exemption that returns an id and nothing else."""
         self.bind(None)
         self.cursor.execute("SELECT find_user_id_by_google_sub('sub-a')")
         self.assertEqual(self.cursor.fetchone()[0], ALICE)
+
+    def test_gmail_push_lookup_works_without_a_bound_user(self):
+        """Pub/Sub has an email but cannot read users until it learns the id."""
+        self.bind(None)
+        self.cursor.execute("SELECT id FROM users WHERE email = 'a@test.example'")
+        self.assertIsNone(self.cursor.fetchone())
+
+        self.cursor.execute("SELECT find_connected_user_id_by_email('A@TEST.EXAMPLE')")
+        self.assertEqual(self.cursor.fetchone()[0], ALICE)
+
+    def test_gmail_push_lookup_skips_disconnected_accounts(self):
+        self.bind(ALICE)
+        self.cursor.execute("UPDATE users SET disconnected_at = now() WHERE id = %s", (ALICE,))
+        self.bind(None)
+
+        self.cursor.execute("SELECT find_connected_user_id_by_email('a@test.example')")
+        self.assertIsNone(self.cursor.fetchone()[0])
 
     # ------------------------------------------------- the worker's sweeps
     #
