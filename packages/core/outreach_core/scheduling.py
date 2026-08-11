@@ -58,7 +58,7 @@ def resolve_timezone(name: str) -> ZoneInfo:
 class SendingWindow:
     """One user's sending hours. Persisted on the ``profiles`` row."""
 
-    timezone: str = "UTC"
+    timezone: str = "Asia/Kolkata"
     start: time = time(9, 0)
     end: time = time(17, 0)
     days: tuple[str, ...] = WEEKDAYS
