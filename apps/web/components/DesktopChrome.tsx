@@ -50,7 +50,7 @@ function NavLink({ href, icon, label, active }: { href: string; icon: IconName; 
  */
 function PoolUpsell() {
   return (
-    <Link href="/pool" className="rail-link mt-2" title="Get the contact pool">
+    <Link href="/pool" className="rail-link rail-upsell mt-2" title="Get the contact pool">
       <span className="rail-icon" style={{ color: "var(--lime)" }}>
         <Icon name="sparkle" size={19} strokeWidth={1.8} />
       </span>

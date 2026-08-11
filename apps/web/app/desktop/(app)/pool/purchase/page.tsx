@@ -30,7 +30,10 @@ export default async function PurchasePage() {
         </div>
       </div>
 
-      <div className="max-w-2xl">
+      {/* Wide enough for the QR card and the upload form to sit beside each
+          other, capped so the form does not stretch into a line length nobody
+          wants to read a consent notice at. */}
+      <div className="max-w-4xl">
         <PurchasePanel billing={billing} />
       </div>
     </>
