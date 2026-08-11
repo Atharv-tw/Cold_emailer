@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
 from pydantic import BaseModel
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, text
 
 from ..db import SessionFactory, bind_user
 from ..deps import CurrentUser, Db, SettingsDep
@@ -57,10 +57,21 @@ async def gmail_push(
         return
 
     async with SessionFactory() as session:
-        user = await session.scalar(select(User).where(User.email == email))
+        # Pub/Sub is not a signed-in browser request, so there is no user id
+        # available to bind before this lookup. An unbound session correctly
+        # sees no `users` rows under RLS. This SECURITY DEFINER function answers
+        # only the identity question and returns only an id; every read after
+        # it is made on the ordinary, user-bound session.
+        user_id = await session.scalar(
+            text("SELECT find_connected_user_id_by_email(:email)"), {"email": email}
+        )
+        if user_id is None:
+            return
+        await bind_user(session, user_id)
+
+        user = await session.get(User, user_id)
         if user is None or user.disconnected_at is not None:
             return
-        await bind_user(session, user.id)
 
         watch = await session.get(GmailWatch, user.id)
         start = watch.history_id if watch and watch.history_id else None
