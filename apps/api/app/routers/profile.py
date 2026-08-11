@@ -64,6 +64,12 @@ def _out(profile, projects, experience) -> ProfileOut:
         links=profile.links or {},
         sending_window=profile.sending_window or {},
         daily_cap=profile.daily_cap,
+        # Every field on `ProjectIn` has to appear here. They all carry
+        # defaults, so one left out does not fail - it comes back empty, the
+        # form renders blank, and the value looks like it was never saved when
+        # it is sitting in the database the whole time. `demo_url` did exactly
+        # that between 0006 and now; `test_profile_out.py` is what stops the
+        # next column repeating it.
         projects=[
             {
                 "id": str(p.id),
@@ -71,6 +77,7 @@ def _out(profile, projects, experience) -> ProfileOut:
                 "summary": p.summary,
                 "tech": p.tech,
                 "url": p.url,
+                "demo_url": p.demo_url,
                 "highlights": p.highlights or [],
                 "categories": p.categories or [],
                 "best_for": p.best_for or [],
