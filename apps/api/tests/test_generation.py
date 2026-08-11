@@ -172,16 +172,22 @@ class TestPromptRules(unittest.TestCase):
 class TestFirstEmailShape(unittest.TestCase):
     def test_the_first_email_asks_for_three_paragraphs(self):
         text = prompt(step=1)
-        self.assertIn("exactly three paragraphs", text)
+        self.assertIn("three paragraphs and nothing else", text)
         for role in ("1. Intro", "2. The work", "3. The ask"):
             self.assertIn(role, text, role)
+
+    def test_the_shape_is_stated_briefly(self):
+        # The first draft of this block spelled out what each paragraph was
+        # for, and the model answered in kind - dense, over-explained mail.
+        # Terse instructions are the whole point, so the length is asserted.
+        self.assertLess(len(FIRST_TOUCH_RULES), 500)
 
     def test_the_shape_does_not_leak_into_follow_ups(self):
         # A follow-up is two or three sentences; three paragraphs would be
         # the pitch all over again, which is what nobody replies to.
         for step in (2, 3):
             text = prompt(step=step, thread=[("Subject", "Body")])
-            self.assertNotIn("exactly three paragraphs", text)
+            self.assertNotIn("three paragraphs and nothing else", text)
             self.assertIn("does not apply", text)
 
     def test_templates_steer_within_the_shape_rather_than_replacing_it(self):
