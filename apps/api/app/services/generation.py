@@ -250,6 +250,48 @@ def build_prompt(
     return "\n\n".join(parts)
 
 
+# A wrapped line starts with a bullet often enough that gluing it to the line
+# above would build a run-on out of a list. The prompt forbids bullets, but
+# this runs on model output, and "the prompt forbids it" is not a guarantee -
+# that is the whole reason this function exists.
+_LIST_MARKERS = ("-", "*", "•", "–", "—", ">")
+
+
+def unwrap_paragraphs(body: str) -> str:
+    """Undo hard wrapping, so a paragraph is one line again.
+
+    The system prompt asks for unwrapped paragraphs and the model complies
+    most of the time, which is worse than never complying: the wrapped ones
+    ship, and a newline mid-sentence survives all the way to the inbox because
+    every layer below here treats the body as text to deliver verbatim. Gmail
+    renders plain text with the breaks intact, so the reader sees a column of
+    sixty-character lines that nothing in the codebase asked for.
+
+    Blank lines are the paragraph separator and are preserved exactly. Within
+    a paragraph, a line break is a wrap artifact and is replaced by a space -
+    the model was told to write "single long lines", so a break it inserted
+    anyway carries no meaning to keep.
+
+    This runs on the model's output, before the draft reaches the editor, and
+    never at send time. What the user types into the draft is theirs, blank
+    lines and all - see :mod:`outreach_core.mime` for the same rule applied to
+    the sign-off.
+    """
+    paragraphs: list[str] = []
+    for block in (body or "").split("\n\n"):
+        lines = [line.strip() for line in block.splitlines()]
+        lines = [line for line in lines if line]
+        if not lines:
+            continue
+        joined = lines[0]
+        for line in lines[1:]:
+            # A list keeps its breaks; prose does not.
+            separator = "\n" if line.startswith(_LIST_MARKERS) else " "
+            joined += separator + line
+        paragraphs.append(joined)
+    return "\n\n".join(paragraphs)
+
+
 def split_subject(text: str) -> tuple[str, str]:
     """Pull 'Subject: ...' off the front. Models sometimes skip it."""
     lines = text.splitlines()
@@ -289,6 +331,7 @@ async def generate(
     )
     text = await client.generate_text(prompt, temperature=temperature, max_output_tokens=4096)
     subject, body = split_subject(text)
+    body = unwrap_paragraphs(body)
 
     if not body:
         raise AIError("The model returned a subject with no body. Try regenerating.")

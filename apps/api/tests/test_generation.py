@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "packages" / "core"
 
 from app.services.generation import (  # noqa: E402
     build_prompt, ranked_projects, recipient_block, sender_block, split_subject,
+    unwrap_paragraphs,
 )
 from app.services.playbooks import (  # noqa: E402
     FIRST_TOUCH_RULES, FOLLOW_UP_RULES, LAST_TOUCH_RULES, TARGET_PLAYBOOKS,
@@ -244,6 +245,53 @@ class TestSplitSubject(unittest.TestCase):
     def test_a_subject_line_in_the_body_is_not_mistaken_for_the_header(self):
         _, body = split_subject("Subject: Real\n\nHi,\n\nSubject: not a header\n")
         self.assertIn("Subject: not a header", body)
+
+
+class TestUnwrapParagraphs(unittest.TestCase):
+    """The model hard-wraps despite being told not to, and the break reaches
+    the inbox: Gmail renders plain text verbatim, so a wrapped draft arrives
+    as a narrow column of text."""
+
+    def test_a_hard_wrapped_paragraph_becomes_one_line(self):
+        body = (
+            "Hi Test,\n\n"
+            "I noticed Test's focus on security infra for your platform. I am\n"
+            "a Full-Stack Developer and AI Engineer studying Computer Science at\n"
+            "GGSIPU.\n\n"
+            "Are you taking on interns right now?"
+        )
+        unwrapped = unwrap_paragraphs(body)
+        self.assertEqual(
+            unwrapped,
+            "Hi Test,\n\n"
+            "I noticed Test's focus on security infra for your platform. I am "
+            "a Full-Stack Developer and AI Engineer studying Computer Science at GGSIPU.\n\n"
+            "Are you taking on interns right now?",
+        )
+
+    def test_paragraph_breaks_survive(self):
+        """Joining everything would be the same bug in the other direction."""
+        body = "Hi Test,\n\nOne.\n\nTwo.\n\nThree?"
+        self.assertEqual(unwrap_paragraphs(body), body)
+        self.assertEqual(unwrap_paragraphs(body).count("\n\n"), 3)
+
+    def test_an_already_unwrapped_body_is_untouched(self):
+        body = "Hi Test,\n\nA single long line that the model wrote exactly as asked.\n\nThe ask?"
+        self.assertEqual(unwrap_paragraphs(body), body)
+
+    def test_bullets_keep_their_line_breaks(self):
+        """The prompt forbids lists, so this only runs when the model already
+        broke a rule - gluing them into a run-on would compound it."""
+        body = "Hi Test,\n\nTwo things:\n- One\n- Two"
+        self.assertEqual(unwrap_paragraphs(body), "Hi Test,\n\nTwo things:\n- One\n- Two")
+
+    def test_stray_blank_lines_and_trailing_space_collapse(self):
+        self.assertEqual(unwrap_paragraphs("Hi,\n\n\n\nBody.  \n\n"), "Hi,\n\nBody.")
+
+    def test_empty_body_stays_empty(self):
+        """`generate` raises on an empty body; it must still be empty to see."""
+        self.assertEqual(unwrap_paragraphs(""), "")
+        self.assertEqual(unwrap_paragraphs("   \n\n  "), "")
 
 
 class TestBlocks(unittest.TestCase):
