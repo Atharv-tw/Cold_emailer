@@ -2,9 +2,14 @@
 
 What happens to the file is told to the user at the moment they upload, not in
 a policy: it goes to Gemini to be read, what comes back is stored, and the
-original is deleted after parsing unless they ask to keep it. This module is
-where that promise is actually kept, so the deletion is unconditional and
-happens in the same request rather than in a cleanup job that might not run.
+original is deleted after parsing. This module is where that promise is
+actually kept, so the deletion happens in the same request rather than in a
+cleanup job that might not run.
+
+The `keep_original` form field still exists below for API backward
+compatibility - old clients or direct API calls can still ask to keep the
+file - but the profile UI no longer offers that choice, so every upload from
+the app itself deletes the original.
 
 Parsing never writes to the profile. Everything extracted comes back as a
 suggestion for the user to confirm, because it is a model's guess about
@@ -32,7 +37,7 @@ router = APIRouter(prefix="/v1/resumes", tags=["resumes"])
 DISCLOSURE = {
     "sent_to_model": "The text of your resume is sent to Google Gemini to be read.",
     "stored": "What it extracts - your headline, bio, links, education, projects and roles - is stored on your profile.",
-    "original": "The file itself is deleted as soon as it has been read, unless you tick 'keep the original'.",
+    "original": "The file itself is deleted as soon as it has been read.",
     "encryption": "Everything is encrypted at rest.",
     "deletion": "'Delete my resume and parsed data' in settings deletes all of it, files included.",
     "no_ocr": "Scanned or image-only PDFs cannot be read. If yours is one, fill the form in by hand instead.",
