@@ -320,7 +320,6 @@ export default function ProfileForm({ profile, disclosure, user }: Props) {
   const [avatarPending, startAvatarTransition] = useTransition();
 
   const [resumeFile, setResumeFile] = useState<File | null>(null);
-  const [keepOriginal, setKeepOriginal] = useState(false);
   const [reading, setReading] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const resumeInput = useRef<HTMLInputElement>(null);
@@ -364,7 +363,6 @@ export default function ProfileForm({ profile, disclosure, user }: Props) {
     try {
       const form = new FormData();
       form.append("file", resumeFile);
-      if (keepOriginal) form.append("keep_original", "on");
 
       const read = await uploadResume(form, geminiKey);
       if (!read.ok) {
@@ -402,11 +400,7 @@ export default function ProfileForm({ profile, disclosure, user }: Props) {
 
       setExtracted(touched);
       setDirty(true);
-      setStatus(
-        parsed.original_kept
-          ? "Read it. Check everything, then save — nothing is on your profile yet."
-          : "Read it, and the file has been deleted. Check everything, then save.",
-      );
+      setStatus("Read it, and the file has been deleted. Check everything, then save.");
     } finally {
       setReading(false);
     }
@@ -577,15 +571,6 @@ export default function ProfileForm({ profile, disclosure, user }: Props) {
                     <Icon name="x" size={14} />
                   </button>
                 </div>
-
-                <label className="m-0 flex items-center gap-2 text-[12.5px] text-white/70">
-                  <input
-                    type="checkbox"
-                    checked={keepOriginal}
-                    onChange={(event) => setKeepOriginal(event.target.checked)}
-                  />
-                  Keep the original file
-                </label>
 
                 <button
                   type="button"
