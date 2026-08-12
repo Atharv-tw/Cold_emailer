@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import Icon from "@/components/Icon";
 import LandingAccordion from "@/components/LandingAccordion";
+import { supportEmail } from "@/lib/site";
 
 /* ---------- sub-components (server, no state) ---------- */
 
@@ -450,24 +451,46 @@ export default async function Home() {
       </section>
 
       {/* ─── Footer ─── */}
-      <footer className="flex flex-col items-center gap-6 px-8 py-10 text-center sm:flex-row sm:justify-between sm:px-16">
-        <Logo />
-        <nav className="flex items-center gap-6 text-xs text-muted">
-          <a href="#how-it-works" className="hover:text-fg">
-            How it works
-          </a>
-          <a href="#features" className="hover:text-fg">
-            Features
-          </a>
-          <a href="#faq" className="hover:text-fg">
-            FAQ
-          </a>
-        </nav>
-        <div className="flex items-center gap-4 text-xs text-muted">
-          <span>Built for people doing their own outreach.</span>
-          <Link href="/login" className="font-medium text-fg underline">
-            Sign in
+      <footer className="flex flex-col items-center gap-6 px-8 py-10 text-center sm:px-16">
+        <div className="flex w-full flex-col items-center gap-6 sm:flex-row sm:justify-between">
+          <Logo />
+          <nav className="flex items-center gap-6 text-xs text-muted">
+            <a href="#how-it-works" className="hover:text-fg">
+              How it works
+            </a>
+            <a href="#features" className="hover:text-fg">
+              Features
+            </a>
+            <a href="#faq" className="hover:text-fg">
+              FAQ
+            </a>
+          </nav>
+          <div className="flex items-center gap-4 text-xs text-muted">
+            <span>Built for people doing their own outreach.</span>
+            <Link href="/login" className="font-medium text-fg underline">
+              Sign in
+            </Link>
+          </div>
+        </div>
+        <div
+          className="flex w-full flex-wrap items-center justify-center gap-x-6 gap-y-2 pt-6 text-xs text-muted"
+          style={{ borderTop: "1px solid var(--line)" }}
+        >
+          <Link href="/privacy" className="hover:text-fg">
+            Privacy policy
           </Link>
+          <Link href="/terms" className="hover:text-fg">
+            Terms of service
+          </Link>
+          <a href={`mailto:${supportEmail}`} className="hover:text-fg">
+            Contact us
+          </a>
+          <a
+            href={`mailto:${supportEmail}?subject=${encodeURIComponent("Issue report — Outreach")}`}
+            className="hover:text-fg"
+          >
+            Report an issue
+          </a>
         </div>
       </footer>
     </main>
