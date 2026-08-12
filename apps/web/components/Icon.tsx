@@ -36,6 +36,7 @@ export type IconName =
   | "briefcase"
   | "cap"
   | "folder"
+  | "more"
   | "x";
 
 const PATHS: Record<IconName, React.ReactNode> = {
@@ -194,6 +195,16 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <path d="m6 6 12 12" />
       <path d="M18 6 6 18" />
+    </>
+  ),
+  // Filled rather than stroked, unlike the rest of the set: three 1px-stroked
+  // rings at 24px read as smudges, and this one sits in the mobile tab bar
+  // where it has to hold its own next to solid glyphs.
+  more: (
+    <>
+      <circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+      <circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none" />
     </>
   ),
 };

@@ -1,7 +1,7 @@
 import MobileChrome from "@/components/MobileChrome";
 import { requireAuth } from "@/lib/auth-guard";
 import { api } from "@/lib/api";
-import type { SessionUser } from "@/lib/types";
+import type { Ops, SessionUser } from "@/lib/types";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await requireAuth();
@@ -10,10 +10,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // stale (a new avatar or name from the API won't show until next login).
   // Fetching `/v1/auth/me` here instead means every page load reflects
   // whatever is actually in the database.
-  const user = await api<SessionUser>("/v1/auth/me").catch(() => session.apiUser);
+  const [user, ops] = await Promise.all([
+    api<SessionUser>("/v1/auth/me").catch(() => session.apiUser),
+    api<Ops>("/v1/ops").catch(() => null),
+  ]);
 
   return (
-    <MobileChrome user={user}>
+    <MobileChrome user={user} ops={ops}>
       {children}
     </MobileChrome>
   );

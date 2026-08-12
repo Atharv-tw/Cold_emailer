@@ -223,7 +223,16 @@ export default function DraftEditor({
         )}
         <label>
           Body
-          <textarea rows={14} value={body} onChange={(event) => setBody(event.target.value)} />
+          {/* 8 rows rather than 14: on a phone with the keyboard up, 14 rows
+              is taller than what is left of the screen, so the send buttons
+              below it were never in view while writing. `min-h` puts the
+              height back where there is room for it. */}
+          <textarea
+            rows={8}
+            className="min-h-[10rem] sm:min-h-[20rem]"
+            value={body}
+            onChange={(event) => setBody(event.target.value)}
+          />
         </label>
         <p className="muted">{body.length} characters — under 900 reads better.</p>
       </section>
@@ -246,7 +255,9 @@ export default function DraftEditor({
       <InlineError error={error} />
       <ErrorModal error={error} onClose={() => setError(null)} />
 
-      <section>
+      {/* Up to five full-size buttons live here. Without wrapping they run off
+          the side of a phone rather than stacking. */}
+      <section className="flex flex-wrap gap-2">
         <button
           type="button"
           className="quiet"

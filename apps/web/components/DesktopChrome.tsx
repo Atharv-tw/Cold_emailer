@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import type { Session } from "next-auth";
 
-import { logout } from "@/app/desktop/(app)/actions";
+import { logout } from "@/app/actions";
 import GeminiKeyPill from "@/components/GeminiKeyPill";
 import Icon, { type IconName } from "@/components/Icon";
 import type { Ops } from "@/lib/types";

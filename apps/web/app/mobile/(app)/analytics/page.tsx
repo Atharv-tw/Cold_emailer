@@ -1,105 +1,75 @@
-import Link from "next/link";
-import { redirect } from "next/navigation";
-
-import { auth } from "@/auth";
+import AnalyticsTabs from "@/components/AnalyticsTabs";
 import { api } from "@/lib/api";
-import type { Analytics, AnalyticsFacetRow } from "@/lib/types";
+import { requireAuth } from "@/lib/auth-guard";
+import type { Analytics } from "@/lib/types";
 
 function pct(fraction: number): string {
   return `${Math.round(fraction * 100)}%`;
 }
 
-function label(value: string): string {
-  return value === "unset" ? "unset" : value.replace(/_/g, " ");
-}
-
-function Facet({ title, rows }: { title: string; rows: AnalyticsFacetRow[] }) {
-  const withContact = rows.filter((row) => row.contacted > 0);
-  return (
-    <section>
-      <h2>{title}</h2>
-      {withContact.length === 0 ? (
-        <p className="muted">Nobody contacted yet.</p>
-      ) : (
-        <div className="table-scroll">
-          <table className="preview">
-            <thead>
-              <tr>
-                <th>{title}</th>
-                <th>Contacted</th>
-                <th>Replied</th>
-                <th>Reply rate</th>
-              </tr>
-            </thead>
-            <tbody>
-              {withContact.map((row) => (
-                <tr key={row.value}>
-                  <td>{label(row.value)}</td>
-                  <td className="muted">{row.contacted}</td>
-                  <td className="muted">{row.replied}</td>
-                  <td>{pct(row.contacted ? row.replied / row.contacted : 0)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
-  );
-}
-
+/**
+ * The three rates, then the same facet breakdown desktop shows.
+ *
+ * The previous version of this page hand-rolled its own facet tables and wrote
+ * the totals into `.bucket` markup - a class that does not exist in
+ * `globals.css`, so it rendered unstyled. `AnalyticsTabs` is what desktop
+ * already uses for the same three facets, and sharing it is what stops the two
+ * screens disagreeing about what a reply rate is.
+ */
 export default async function AnalyticsPage() {
-  const session = await auth();
-  if (!session?.apiUser) redirect("/");
+  await requireAuth();
 
   const data = await api<Analytics>("/v1/analytics");
   const t = data.totals;
 
   return (
-    <main>
-      <h1>Analytics</h1>
-      <p>
-        <Link href="/dashboard">← Dashboard</Link>
+    <>
+      <div className="page-header">
+        <div>
+          <h1>Analytics</h1>
+          <p>
+            {t.sent} sent · {t.contacted} people contacted · {t.replied} replied
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        <div className="dz-card items-center py-4 text-center">
+          <span className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted">Reply</span>
+          <div className="stat-value">{pct(t.reply_rate)}</div>
+        </div>
+        <div className="dz-card items-center py-4 text-center">
+          <span className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted">Bounce</span>
+          <div className="stat-value">{pct(t.bounce_rate)}</div>
+        </div>
+        <div className="dz-card items-center py-4 text-center">
+          <span className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted">Opt-out</span>
+          <div className="stat-value">{pct(t.opt_out_rate)}</div>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted">
+        <span>
+          <strong className="text-fg">{data.active_sequences}</strong> active
+        </span>
+        <span>
+          <strong className="text-fg">{data.follow_ups_due}</strong> follow-ups due
+        </span>
+        <span>
+          <strong className="text-fg">{data.stale}</strong> gone quiet
+        </span>
+      </div>
+
+      <p className="text-xs text-muted">
+        Rates are against people contacted, not messages sent — {t.bounced} bounced, {t.opted_out}{" "}
+        opted out.
       </p>
 
-      <section>
-        <h2>Overall</h2>
-        <div className="buckets">
-          <div className="bucket">
-            <span className="bucket-count">{pct(t.reply_rate)}</span>
-            <span className="bucket-label">Reply rate</span>
-          </div>
-          <div className="bucket">
-            <span className="bucket-count">{pct(t.bounce_rate)}</span>
-            <span className="bucket-label">Bounce rate</span>
-          </div>
-          <div className="bucket">
-            <span className="bucket-count">{pct(t.opt_out_rate)}</span>
-            <span className="bucket-label">Opt-out rate</span>
-          </div>
-          <div className="bucket">
-            <span className="bucket-count">{data.active_sequences}</span>
-            <span className="bucket-label">Active</span>
-          </div>
-          <div className="bucket">
-            <span className="bucket-count">{data.follow_ups_due}</span>
-            <span className="bucket-label">Follow-ups due</span>
-          </div>
-          <div className="bucket">
-            <span className="bucket-count">{data.stale}</span>
-            <span className="bucket-label">Stale</span>
-          </div>
-        </div>
-        <p className="muted">
-          {t.sent} sent · {t.contacted} people contacted · {t.replied} replied ·{" "}
-          {t.bounced} bounced · {t.opted_out} opted out. Rates are against people
-          contacted, not messages sent.
-        </p>
-      </section>
-
-      <Facet title="Target type" rows={data.by_target_type} />
-      <Facet title="Company type" rows={data.by_company_type} />
-      <Facet title="Intent" rows={data.by_intent} />
-    </main>
+      <AnalyticsTabs
+        byTargetType={data.by_target_type}
+        byCompanyType={data.by_company_type}
+        byIntent={data.by_intent}
+      />
+    </>
   );
 }

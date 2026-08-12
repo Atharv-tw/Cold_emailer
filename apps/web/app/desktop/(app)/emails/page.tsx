@@ -4,6 +4,7 @@ import NewEmailButton from "@/components/NewEmailButton";
 import LocalTime from "@/components/LocalTime";
 import { api } from "@/lib/api";
 import { requireAuth } from "@/lib/auth-guard";
+import { statusOf } from "@/lib/message-status";
 import type { MessageOut } from "@/lib/types";
 
 // Clock times are formatted in the browser - see LocalTime. Formatting them
@@ -14,28 +15,6 @@ const WHEN: Intl.DateTimeFormatOptions = {
   hour: "2-digit",
   minute: "2-digit",
 };
-
-function statusOf(message: MessageOut): {
-  label: string;
-  tone: string;
-  accent: string;
-  iconBg: string;
-  iconColor: string;
-} {
-  if (message.is_undeliverable) {
-    return { label: "Undeliverable", tone: "badge-danger", accent: "var(--danger)", iconBg: "var(--danger-light)", iconColor: "var(--danger)" };
-  }
-  if (message.status === "failed") {
-    return { label: "Failed", tone: "badge-danger", accent: "var(--danger)", iconBg: "var(--danger-light)", iconColor: "var(--danger)" };
-  }
-  if (message.is_reply) {
-    return { label: "Replied", tone: "badge-completed", accent: "var(--accent)", iconBg: "var(--accent-light)", iconColor: "var(--accent)" };
-  }
-  if (message.status === "sent") {
-    return { label: "Sent", tone: "badge-pending", accent: "var(--orange)", iconBg: "var(--orange-light)", iconColor: "var(--orange)" };
-  }
-  return { label: message.status, tone: "badge-pending", accent: "var(--line)", iconBg: "var(--cream)", iconColor: "var(--muted)" };
-}
 
 export default async function EmailsPage() {
   await requireAuth();

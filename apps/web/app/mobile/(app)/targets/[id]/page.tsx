@@ -1,27 +1,36 @@
-import Link from "next/link";
-import { redirect } from "next/navigation";
-
-import { auth } from "@/auth";
 import DraftEditor from "@/components/DraftEditor";
-import LocalTime from "@/components/LocalTime";
 import ReplyCard from "@/components/ReplyCard";
+import ThreadPanel from "@/components/ThreadPanel";
+import TimelineList from "@/components/TimelineList";
 import { api } from "@/lib/api";
+import { requireAuth } from "@/lib/auth-guard";
 import type { Draft, EmailTemplate, Reply, Target, TargetDetail } from "@/lib/types";
 
 const VERIFICATION_TONE: Record<string, string> = {
-  deliverable: "ok",
-  risky: "muted",
-  undeliverable: "error",
-  unknown: "muted",
+  deliverable: "badge-completed",
+  risky: "badge-pending",
+  undeliverable: "badge-danger",
+  unknown: "badge-pending",
 };
 
+/**
+ * One target, in the order that matters on a phone: what they said, then what
+ * to say back, then the record.
+ *
+ * Desktop puts compose and the thread side by side. Stacked, that ordering
+ * would bury the draft under a thread that grows with every touch, so the
+ * thread and history move below it.
+ *
+ * This page previously rendered `<fieldset>`/`<pre>` markup of its own instead
+ * of `ThreadPanel`, and did not pass `queued_for` to the editor - so on mobile
+ * a queued send showed no notice and offered no way to cancel it.
+ */
 export default async function TargetPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const session = await auth();
-  if (!session?.apiUser) redirect("/");
+  await requireAuth();
 
   const { id } = await params;
   const [target, detail, draft, templates, reply] = await Promise.all([
@@ -36,78 +45,73 @@ export default async function TargetPage({
   ]);
 
   const verification = target.verification ?? {};
-  const tone = VERIFICATION_TONE[verification.status ?? "unknown"] ?? "muted";
+  const tone = VERIFICATION_TONE[verification.status ?? "unknown"] ?? "badge-pending";
 
   return (
-    <main>
-      <h1>{target.name || target.email}</h1>
-      <p className="muted">
-        {target.email}
-        {target.company && ` · ${target.company}`}
-        {target.role && ` · ${target.role}`}
-      </p>
+    <>
+      <div className="page-header">
+        <div className="min-w-0">
+          <h1 className="break-words">{target.name || target.email}</h1>
+          <p className="break-words">
+            {target.email}
+            {target.company && ` · ${target.company}`}
+            {target.role && ` · ${target.role}`}
+          </p>
+        </div>
+      </div>
 
+      {/* Above everything, including the compose box. Once someone has
+          answered, what they said is the only thing on this page worth reading
+          first - and the sequence is over, so the draft below it is no longer
+          actionable anyway. */}
       {reply && <ReplyCard reply={reply} />}
 
-      {verification.status && verification.status !== "deliverable" && (
-        <div className="note">
-          <p className={tone}>{verification.detail}</p>
-          {verification.did_you_mean && (
-            <p className="muted">
-              Suggested correction: {verification.did_you_mean}. The address
-              cannot be edited — delete this and add them again.
-            </p>
-          )}
-        </div>
-      )}
+      {/* "Not configured" is a fact about the deployment, not about this
+          address. Warning on every target for a feature that was never
+          switched on trains people to ignore the banner that matters. */}
+      {verification.status &&
+        verification.status !== "deliverable" &&
+        verification.reason !== "verification_not_configured" && (
+          <div
+            className="dz-card"
+            style={{ background: "var(--warning-light)", border: "1px solid #fde68a", padding: "1rem" }}
+          >
+            <p className={tone}>{verification.detail}</p>
+            {verification.did_you_mean && (
+              <p className="muted" style={{ marginTop: "0.5rem", fontSize: "12px" }}>
+                Suggested correction: <strong>{verification.did_you_mean}</strong>. The address
+                cannot be edited — delete this and add them again.
+              </p>
+            )}
+          </div>
+        )}
 
       {target.hook && (
-        <div className="note">
-          <strong>Why them:</strong> {target.hook}
+        <div className="dz-card" style={{ padding: "1rem", background: "var(--accent-light)" }}>
+          <strong style={{ color: "var(--accent)" }}>Why them:</strong>{" "}
+          <span style={{ color: "var(--fg)" }}>{target.hook}</span>
         </div>
       )}
 
-      <DraftEditor target={target} initial={draft} templates={templates} />
+      <div id="compose" className="dz-card">
+        <h2 style={{ marginBottom: "1rem" }}>Compose</h2>
+        <DraftEditor
+          target={target}
+          initial={draft}
+          templates={templates}
+          queuedFor={detail.queued_for}
+        />
+      </div>
 
-      <section>
-        <h2>Thread</h2>
-        {detail.messages.length === 0 ? (
-          <p className="muted">Nothing sent yet.</p>
-        ) : (
-          detail.messages.map((message) => (
-            <fieldset key={message.step}>
-              <legend>
-                Touch {message.step} · {message.status}
-                {message.sent_at && (
-                  <>
-                    {" · "}
-                    <LocalTime iso={message.sent_at} />
-                  </>
-                )}
-              </legend>
-              <strong>{message.subject}</strong>
-              <pre>{message.body}</pre>
-              {message.error && <p className="error">{message.error}</p>}
-            </fieldset>
-          ))
-        )}
-      </section>
+      <div className="dz-card">
+        <h2 style={{ marginBottom: "1rem" }}>Thread</h2>
+        <ThreadPanel messages={detail.messages} />
+      </div>
 
-      <section>
-        <h2>History</h2>
-        <ul>
-          {detail.timeline.map((entry, index) => (
-            <li key={index} className="muted">
-              <LocalTime iso={entry.at} /> — {entry.type}
-              {entry.detail && `: ${entry.detail}`}
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <p>
-        <Link href="/dashboard">Back to the dashboard</Link>
-      </p>
-    </main>
+      <div className="dz-card">
+        <h2 style={{ marginBottom: "1rem" }}>History</h2>
+        <TimelineList entries={detail.timeline} />
+      </div>
+    </>
   );
 }

@@ -189,7 +189,9 @@ export default function AdminPanel({
         <h2>
           Users <span className="text-muted">— {users.length}</span>
         </h2>
-        <div className="dz-card">
+        {/* The only wide table here that was not wrapped - without this it
+            widens the document instead of scrolling inside its own card. */}
+        <div className="dz-card table-scroll">
           <table>
             <thead>
               <tr>

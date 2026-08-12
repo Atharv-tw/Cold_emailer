@@ -10,7 +10,17 @@ export function middleware(request: NextRequest) {
   const isMobile = /Mobile|Android|iP(hone|od)|IEMobile|BlackBerry|Kindle|Silk-Accelerated|(hpw|web)OS|Opera M(obi|ini)/i.test(userAgent);
 
   const { pathname } = request.nextUrl;
-  
+
+  // A rewrite target must never be rewritten again. Links written as
+  // `/mobile/dashboard` used to come back through here and become
+  // `/mobile/mobile/dashboard`, which matches no route - so the bottom nav,
+  // the header logo and every target card 404'd on a real phone. Links are
+  // unprefixed now; this guard is what stops the bug returning, and it doubles
+  // as a deliberate escape hatch for opening one tree from the other.
+  if (pathname.startsWith('/mobile') || pathname.startsWith('/desktop')) {
+    return NextResponse.next();
+  }
+
   // Clone the URL to rewrite it
   const url = request.nextUrl.clone();
   

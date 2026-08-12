@@ -1,25 +1,25 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { auth } from "@/auth";
 import PurchasePanel from "@/components/PurchasePanel";
 import { api } from "@/lib/api";
+import { requireAuth } from "@/lib/auth-guard";
 import type { Billing } from "@/lib/types";
 
 export default async function PurchasePage() {
-  const session = await auth();
-  if (!session?.apiUser) redirect("/");
+  await requireAuth();
 
   const billing = await api<Billing>("/v1/billing");
   if (billing.is_paid) redirect("/pool");
 
   return (
-    <main>
-      <h1>Get the contact pool</h1>
-      <p>
-        <Link href="/pool">← Back</Link>
-      </p>
+    <>
+      <div className="page-header">
+        <div>
+          <h1>Get the contact pool</h1>
+        </div>
+      </div>
+
       <PurchasePanel billing={billing} />
-    </main>
+    </>
   );
 }

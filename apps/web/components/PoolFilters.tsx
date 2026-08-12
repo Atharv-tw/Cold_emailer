@@ -40,13 +40,15 @@ function SelectGroup({
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</span>
+    // `min-w-0` plus a basis so the group shrinks but not into nothing - see
+    // the same note in TargetFilters.
+    <div className="flex min-w-0 flex-1 basis-[10rem] items-center gap-2 sm:flex-none sm:basis-auto">
+      <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-muted">{label}</span>
       <select
         aria-label={`Filter by ${label.toLowerCase()}`}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="rounded border border-line bg-surface px-2 py-1 text-sm text-fg outline-none focus:border-accent"
+        className="min-w-0 flex-1 rounded border border-line bg-surface px-2 py-1 text-sm text-fg outline-none focus:border-accent sm:flex-none"
       >
         {options.map(([optionValue, text]) => (
           <option key={optionValue} value={optionValue}>
@@ -78,7 +80,7 @@ export default function PoolFilters({ active }: { active: Record<string, string>
   return (
     <div className="flex flex-col gap-3">
       <form
-        className="flex gap-2"
+        className="flex flex-wrap gap-2"
         onSubmit={(event) => {
           event.preventDefault();
           apply({ q: search });
@@ -90,7 +92,7 @@ export default function PoolFilters({ active }: { active: Record<string, string>
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search name, company or role"
           aria-label="Search"
-          className="flex-1"
+          className="min-w-0 flex-1"
         />
         <button type="submit" className="primary">
           Search

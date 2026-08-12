@@ -1,10 +1,9 @@
 import Link from "next/link";
 
 import DraftEditor from "@/components/DraftEditor";
-import Icon from "@/components/Icon";
-import LocalTime from "@/components/LocalTime";
 import ReplyCard from "@/components/ReplyCard";
 import ThreadPanel from "@/components/ThreadPanel";
+import TimelineList from "@/components/TimelineList";
 import { api } from "@/lib/api";
 import { requireAuth } from "@/lib/auth-guard";
 import type { Draft, EmailTemplate, Reply, Target, TargetDetail } from "@/lib/types";
@@ -15,29 +14,6 @@ const VERIFICATION_TONE: Record<string, string> = {
   undeliverable: "badge-danger",
   unknown: "badge-pending",
 };
-
-const getTimelineIcon = (type: string): any => {
-  if (type.includes("sent")) return "send";
-  if (type.includes("cancel") || type.includes("fail")) return "x";
-  if (type.includes("queue")) return "clock";
-  if (type.includes("created")) return "sparkle";
-  return "info";
-};
-
-function EventDetailText({ text }: { text: string }) {
-  if (!text) return null;
-  const parts = text.split(/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:[+-]\d{2}:\d{2}|Z))/);
-  return (
-    <div className="list-desc">
-      {parts.map((part, i) => {
-        if (part.match(/^\d{4}-\d{2}-\d{2}T/)) {
-          return <LocalTime key={i} iso={part} />;
-        }
-        return <span key={i}>{part}</span>;
-      })}
-    </div>
-  );
-}
 
 export default async function TargetPage({
   params,
@@ -130,22 +106,7 @@ export default async function TargetPage({
 
           <div className="dz-card">
             <h2 style={{ marginBottom: "1.5rem" }}>History</h2>
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              {detail.timeline.map((entry, index) => (
-                <div key={index} className="dz-list-item">
-                  <div className="list-icon" style={{ background: "var(--line)", color: "var(--fg)" }}>
-                    <Icon name={getTimelineIcon(entry.type)} size={16} />
-                  </div>
-                  <div className="list-content">
-                    <div className="list-title">{entry.type}</div>
-                    {entry.detail && <EventDetailText text={entry.detail} />}
-                  </div>
-                  <div style={{ fontSize: "11px", color: "var(--muted)" }}>
-                    <LocalTime iso={entry.at} />
-                  </div>
-                </div>
-              ))}
-            </div>
+            <TimelineList entries={detail.timeline} />
           </div>
         </div>
       </div>

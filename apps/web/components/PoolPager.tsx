@@ -41,7 +41,7 @@ export default function PoolPager({
   }
 
   return (
-    <div className="flex items-center justify-between gap-4 py-2">
+    <div className="flex flex-wrap items-center justify-between gap-4 py-2">
       <span className="text-sm text-muted">
         Showing {first}–{last} of {total}
       </span>

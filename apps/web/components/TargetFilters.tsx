@@ -68,13 +68,17 @@ function SelectGroup({
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</span>
+    // `min-w-0` lets the group shrink rather than push the row wider than the
+    // screen; the basis stops it shrinking into nothing. Without the basis all
+    // four groups crowd onto one row at 375px and each select ends up ~18px
+    // wide - technically on-screen, and useless. With it they wrap two per row.
+    <div className="flex min-w-0 flex-1 basis-[10rem] items-center gap-2 sm:flex-none sm:basis-auto">
+      <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-muted">{label}</span>
       <select
         aria-label={`Filter by ${label.toLowerCase()}`}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="rounded border border-line bg-surface px-2 py-1 text-sm text-fg outline-none focus:border-accent"
+        className="min-w-0 flex-1 rounded border border-line bg-surface px-2 py-1 text-sm text-fg outline-none focus:border-accent sm:flex-none"
       >
         {options.map(([optionValue, text]) => (
           <option key={optionValue} value={optionValue}>
@@ -106,7 +110,7 @@ export default function TargetFilters({ active }: { active: Record<string, strin
   return (
     <div className="flex flex-col gap-3">
       <form
-        className="flex gap-2"
+        className="flex flex-wrap gap-2"
         onSubmit={(event) => {
           event.preventDefault();
           apply({ q: search });
@@ -118,7 +122,7 @@ export default function TargetFilters({ active }: { active: Record<string, strin
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search name, company or email"
           aria-label="Search"
-          className="flex-1"
+          className="min-w-0 flex-1"
         />
         <button type="submit" className="primary">
           Search

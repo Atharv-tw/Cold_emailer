@@ -1,156 +1,166 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
-import { auth, signOut } from "@/auth";
-import PwaSetup from "@/components/PwaSetup";
+import FollowUps from "@/components/FollowUps";
+import Icon from "@/components/Icon";
 import LocalTime from "@/components/LocalTime";
+import PwaSetup from "@/components/PwaSetup";
+import ScheduledStat from "@/components/ScheduledStat";
 import { api } from "@/lib/api";
-import type { Dashboard } from "@/lib/types";
+import { requireAuth } from "@/lib/auth-guard";
+import type { Dashboard, ScheduledOut } from "@/lib/types";
 
-// Clock times are formatted in the browser - see LocalTime. Formatting them
-// here would use the server's timezone, which is UTC.
+// A clock time has to be formatted in the browser - see LocalTime.
 const WHEN: Intl.DateTimeFormatOptions = {
   weekday: "short",
   hour: "2-digit",
   minute: "2-digit",
 };
 
-// The operating panel. Each bucket is a count from the dashboard payload and,
-// where a status maps to it, a link into the filtered people list.
-const BUCKETS: { key: string; label: string; href: string }[] = [
-  { key: "draft", label: "Drafts needed", href: "/targets?status=draft" },
-  { key: "scheduled", label: "Scheduled", href: "/targets?status=active" },
-  { key: "active", label: "In flight", href: "/targets?status=active" },
-  { key: "replied", label: "Replied", href: "/targets?status=replied" },
-  { key: "paused", label: "Paused", href: "/targets?status=paused" },
-  { key: "completed", label: "Completed", href: "/targets?status=completed" },
-  { key: "bounced", label: "Bounced", href: "/targets?status=bounced" },
-  { key: "opted_out", label: "Opted out", href: "/targets?status=opted_out" },
-];
+function Stat({
+  label,
+  value,
+  trend,
+  variant = "",
+  icon,
+}: {
+  label: string;
+  value: number | string;
+  trend: string;
+  variant?: string;
+  icon: "mail" | "users" | "send";
+}) {
+  return (
+    <div className={`dz-card ${variant}`}>
+      <div className="stat-title">
+        <span className="font-semibold">{label}</span>
+        <span className="stat-icon">
+          <Icon name={icon} size={14} />
+        </span>
+      </div>
+      <div className="stat-value">{value}</div>
+      <div className="stat-trend muted">{trend}</div>
+    </div>
+  );
+}
 
+/**
+ * The mobile dashboard.
+ *
+ * This replaces a bare-HTML page left over from before the redesign - it had
+ * no styling at all and leaned on `.buckets`/`.bucket-count`, classes that
+ * were never defined in `globals.css`, so it rendered as a stack of unstyled
+ * divs.
+ *
+ * It reads the same three endpoints as desktop and shows the same things in
+ * the same order, in one column. What is deliberately dropped: the sparkline
+ * and the reach donut. `.donut-container` is a fixed 140px and the sparkline
+ * is drawn on a 320-wide viewBox - both survive the squeeze, but neither is
+ * legible enough at this width to earn the vertical space, and the number
+ * underneath each of them says the same thing.
+ */
 export default async function DashboardPage() {
-  const session = await auth();
-  if (!session?.apiUser) redirect("/");
-
-  const user = session.apiUser;
-  const [data, pushKey] = await Promise.all([
+  await requireAuth();
+  const [data, pushKey, followUps] = await Promise.all([
     api<Dashboard>("/v1/dashboard"),
     api<{ key: string }>("/v1/push/key").catch(() => ({ key: "" })),
+    // Already ranked by urgency server-side. A failure here must not take the
+    // dashboard down with it - the rest of this page is still worth showing.
+    api<ScheduledOut>("/v1/dashboard/scheduled").catch(() => ({ items: [] })),
   ]);
 
+  const totalContacts = data.targets.length;
+  const replied = data.counts.replied || 0;
+  const unreadReplies = data.counts.unread_replies || 0;
+  const scheduled = data.counts.scheduled || 0;
+  const reachedCount = data.targets.filter((t) => t.touches_sent > 0).length;
+  const reachedPercent = totalContacts > 0 ? Math.round((reachedCount / totalContacts) * 100) : 0;
+  const sentThisPeriod = data.sent_by_day.reduce((sum, d) => sum + d.count, 0);
+
   return (
-    <main>
-      <h1>Dashboard</h1>
-      <p>
-        <Link href="/analytics">Analytics</Link> ·{" "}
-        <Link href="/ops">Health</Link>
-      </p>
-
-      {!user.connected && (
-        <div className="note">
-          <strong>Google is not connected.</strong> Nothing will send until you
-          sign in again.
+    <>
+      <div className="page-header">
+        <div>
+          <h1>Dashboard</h1>
+          <p>Where your outreach actually stands.</p>
         </div>
-      )}
-
-      {user.missing_scopes.length > 0 && (
-        <div className="note">
-          <strong>Some permissions were not granted.</strong> Without{" "}
-          <code>gmail.readonly</code> this can send but cannot see replies —
-          the one state it must not run in. Sign in again and leave every box
-          ticked.
+        <div className="header-actions">
+          <Link href="/targets/new" className="w-full">
+            <button className="accent flex w-full items-center justify-center gap-1.5">
+              <Icon name="plus" size={17} strokeWidth={2.2} />
+              Add contact
+            </button>
+          </Link>
         </div>
-      )}
+      </div>
 
-      {user.connected && !user.calendar_connected && (
-        <div className="note">
-          <strong>Calendar reminders are off.</strong> Follow-ups still show up
-          here and as notifications. To also see them in Google Calendar, sign
-          in again and leave the calendar box ticked.
-        </div>
-      )}
+      <div className="grid grid-cols-2 gap-3">
+        <Stat
+          label="Replies"
+          value={replied}
+          variant="dz-card-lime"
+          icon="mail"
+          trend={unreadReplies > 0 ? `${unreadReplies} unread` : "People who wrote back"}
+        />
+        <Stat
+          label="Contacts"
+          value={totalContacts}
+          icon="users"
+          trend={`${reachedPercent}% reached once`}
+        />
+        <Stat label="Sent" value={sentThisPeriod} icon="send" trend="Last 30 days" />
+        <ScheduledStat count={scheduled} />
+      </div>
 
-      {/* Pinned at the top on purpose: this is the fallback that works when
-          notifications are denied, revoked, or silently dropped. */}
-      <section>
-        <h2>Due today</h2>
-        {data.due.length === 0 ? (
-          <p className="muted">Nothing due. </p>
+      <FollowUps items={followUps.items} />
+
+      <div className="dz-card">
+        <h2 style={{ marginBottom: "0.75rem" }}>Reply tracker</h2>
+        {data.replies.length === 0 ? (
+          <p className="muted">No replies yet.</p>
         ) : (
-          <ul>
-            {data.due.map((item) => (
-              <li key={`${item.target_id}-${item.step}`}>
-                <Link href={`/targets/${item.target_id}`}>
-                  {item.name || item.email}
-                </Link>{" "}
-                {item.company && <span className="muted">· {item.company}</span>}{" "}
-                <span className="muted">
-                  · touch {item.step} · <LocalTime iso={item.due_at} options={WHEN} />
-                </span>{" "}
-                {!item.has_draft && <span className="badge">needs writing</span>}
-              </li>
+          <div className="flex flex-col">
+            {data.replies.map((reply) => (
+              <Link
+                key={`${reply.target_id}-${reply.at}`}
+                href={`/targets/${reply.target_id}`}
+                className="dz-list-item"
+              >
+                <div className="list-icon">
+                  <Icon name="mail" size={16} />
+                </div>
+                <div className="list-content min-w-0">
+                  <div className="list-title truncate">
+                    {reply.name || "Someone"}
+                    {/* A dot rather than bold text: the row is a link, and
+                        weight changes shift the layout as they are read. */}
+                    {reply.unread && (
+                      <span
+                        aria-label="unread"
+                        title="You have not opened this reply yet"
+                        style={{
+                          display: "inline-block",
+                          width: "7px",
+                          height: "7px",
+                          borderRadius: "50%",
+                          background: "var(--accent)",
+                          marginLeft: "0.5rem",
+                          verticalAlign: "middle",
+                        }}
+                      />
+                    )}
+                  </div>
+                  <div className="list-desc truncate">{reply.company || "—"}</div>
+                </div>
+                <div className="shrink-0" style={{ fontSize: "11px", color: "var(--muted)" }}>
+                  <LocalTime iso={reply.at} options={WHEN} />
+                </div>
+              </Link>
             ))}
-          </ul>
+          </div>
         )}
-      </section>
+      </div>
 
       <PwaSetup vapidKey={pushKey.key} />
-
-      <section>
-        <h2>Where everyone is</h2>
-        <div className="buckets">
-          {BUCKETS.map((bucket) => (
-            <Link key={bucket.label} href={bucket.href} className="bucket">
-              <span className="bucket-count">{data.counts[bucket.key] ?? 0}</span>
-              <span className="bucket-label">{bucket.label}</span>
-            </Link>
-          ))}
-        </div>
-        <p className="muted">
-          {data.counts.sent} sent in total · {data.suppressed} on your
-          do-not-contact list
-        </p>
-      </section>
-
-      <section>
-        <h2>People</h2>
-        <p>
-          <Link href="/targets">See everyone</Link> ·{" "}
-          <Link href="/targets/new">Add someone</Link> ·{" "}
-          <Link href="/import">Import a list</Link> ·{" "}
-          <Link href="/profile">Your profile</Link>
-        </p>
-        {data.targets.length === 0 && <p className="muted">Nobody yet.</p>}
-      </section>
-
-      <section>
-        <h2>Recent</h2>
-        {data.recent.length === 0 ? (
-          <p className="muted">Nothing has happened yet.</p>
-        ) : (
-          <ul>
-            {data.recent.map((entry, index) => (
-              <li key={index} className="muted">
-                <LocalTime iso={entry.at} options={WHEN} /> — {entry.type}
-                {entry.detail && `: ${entry.detail}`}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section>
-        <form
-          action={async () => {
-            "use server";
-            await signOut({ redirectTo: "/" });
-          }}
-        >
-          <button type="submit" className="quiet">
-            Sign out ({user.email})
-          </button>
-        </form>
-      </section>
-    </main>
+    </>
   );
 }

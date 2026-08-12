@@ -1050,7 +1050,7 @@ export default function ProfileForm({ profile, disclosure, user }: Props) {
             The photo and the resume upload on the left save themselves.
           */}
           <div className="sticky bottom-4 z-30">
-            <div className="flex items-center gap-3 rounded-full bg-surface p-2 pl-5 shadow-[var(--shadow-float)] ring-1 ring-line">
+            <div className="flex items-center gap-2 rounded-full bg-surface p-2 pl-4 shadow-[var(--shadow-float)] ring-1 ring-line sm:gap-3 sm:pl-5">
               <span className="min-w-0 flex-1 truncate text-[13px]">
                 {reading ? (
                   <Working label="Reading your resume" />
@@ -1069,7 +1069,7 @@ export default function ProfileForm({ profile, disclosure, user }: Props) {
               </span>
               <button
                 type="button"
-                className={dirty ? "accent" : "secondary"}
+                className={`shrink-0 ${dirty ? "accent" : "secondary"}`}
                 onClick={onSave}
                 disabled={pending || !dirty}
               >
