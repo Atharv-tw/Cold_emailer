@@ -308,26 +308,24 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* ─── Footer ─── */}
-      <footer className="flex flex-col items-center gap-5 px-5 py-10 text-center">
+      {/* ─── Footer ───
+          One block, matching desktop. The section anchors went with it: they
+          pointed back up a page the reader has just scrolled through, and the
+          sections they name are the thing directly above. */}
+      <footer
+        className="flex flex-col items-center gap-4 px-5 py-10 text-center"
+        style={{ borderTop: "1px solid var(--line)" }}
+      >
         <Logo />
-        <nav className="flex items-center gap-5 text-xs text-muted">
-          <a href="#how-it-works">How it works</a>
-          <a href="#features">Features</a>
-          <a href="#faq">FAQ</a>
-        </nav>
-        <span className="text-xs text-muted">Built for people doing their own outreach.</span>
-        <div
-          className="flex w-full flex-wrap items-center justify-center gap-x-5 gap-y-2 pt-5 text-xs text-muted"
-          style={{ borderTop: "1px solid var(--line)" }}
-        >
+        <nav className="flex w-full flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-muted">
           <Link href="/privacy">Privacy policy</Link>
           <Link href="/terms">Terms of service</Link>
           <a href={`mailto:${supportEmail}`}>Contact us</a>
           <a href={`mailto:${supportEmail}?subject=${encodeURIComponent("Issue report — Outreach")}`}>
             Report an issue
           </a>
-        </div>
+        </nav>
+        <span className="text-xs text-muted">Built for people doing their own outreach.</span>
       </footer>
     </main>
   );

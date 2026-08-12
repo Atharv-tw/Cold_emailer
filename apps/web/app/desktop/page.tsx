@@ -450,32 +450,23 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* ─── Footer ─── */}
-      <footer className="flex flex-col items-center gap-6 px-8 py-10 text-center sm:px-16">
-        <div className="flex w-full flex-col items-center gap-6 sm:flex-row sm:justify-between">
+      {/* ─── Footer ───
+          One row, not two. The upper row used to be the header again - same
+          logo, same three section anchors, same Sign in - which made the
+          bottom of the page read as somewhere new to start rather than as the
+          end. What is left is the part that exists only down here: the legal
+          and contact links, beside the line about who this is for. */}
+      <footer
+        className="flex w-full flex-col items-center gap-4 px-8 py-10 text-center sm:flex-row sm:justify-between sm:gap-6 sm:px-16 sm:text-left"
+        style={{ borderTop: "1px solid var(--line)" }}
+      >
+        <div className="flex flex-col items-center gap-3 sm:flex-row sm:gap-4">
           <Logo />
-          <nav className="flex items-center gap-6 text-xs text-muted">
-            <a href="#how-it-works" className="hover:text-fg">
-              How it works
-            </a>
-            <a href="#features" className="hover:text-fg">
-              Features
-            </a>
-            <a href="#faq" className="hover:text-fg">
-              FAQ
-            </a>
-          </nav>
-          <div className="flex items-center gap-4 text-xs text-muted">
-            <span>Built for people doing their own outreach.</span>
-            <Link href="/login" className="font-medium text-fg underline">
-              Sign in
-            </Link>
-          </div>
+          <span className="text-xs text-muted">
+            Built for people doing their own outreach.
+          </span>
         </div>
-        <div
-          className="flex w-full flex-wrap items-center justify-center gap-x-6 gap-y-2 pt-6 text-xs text-muted"
-          style={{ borderTop: "1px solid var(--line)" }}
-        >
+        <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-muted">
           <Link href="/privacy" className="hover:text-fg">
             Privacy policy
           </Link>
@@ -491,7 +482,7 @@ export default async function Home() {
           >
             Report an issue
           </a>
-        </div>
+        </nav>
       </footer>
     </main>
   );
