@@ -1,5 +1,3 @@
-import { ApiError } from "@/lib/api";
-
 /**
  * How a server action reports a failure the user is meant to read.
  *
@@ -34,8 +32,8 @@ export type Result<T> = { ok: true; data: T } | { ok: false; error: ActionError 
 export async function attempt<T>(run: () => Promise<T>): Promise<Result<T>> {
   try {
     return { ok: true, data: await run() };
-  } catch (caught) {
-    if (caught instanceof ApiError) {
+  } catch (caught: any) {
+    if (caught && caught.constructor && caught.constructor.name === "ApiError") {
       return { ok: false, error: { code: caught.code, message: caught.message } };
     }
     throw caught;
