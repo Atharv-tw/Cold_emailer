@@ -3,7 +3,9 @@
 import { useEffect, useState, useTransition } from "react";
 
 import { deleteMyData } from "@/app/desktop/(app)/profile/actions";
+import { reportIssue } from "@/app/desktop/(app)/settings/actions";
 import { useGeminiKey } from "@/lib/useGeminiKey";
+import { messageOf } from "@/lib/result";
 import type { SessionUser } from "@/lib/types";
 
 /**
@@ -18,6 +20,11 @@ export default function SettingsForm({ user }: { user: SessionUser }) {
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
+
+  const [issueText, setIssueText] = useState("");
+  const [issueStatus, setIssueStatus] = useState("");
+  const [issueError, setIssueError] = useState("");
+  const [issuePending, startIssueTransition] = useTransition();
 
   useEffect(() => setGeminiDraft(geminiKey), [geminiKey]);
 
@@ -118,6 +125,51 @@ export default function SettingsForm({ user }: { user: SessionUser }) {
 
       {status && <p className="ok">{status}</p>}
       {error && <p className="error">{error}</p>}
+
+      <section className="dz-card">
+        <h2 style={{ marginBottom: "0.5rem" }}>Report an issue</h2>
+        <p className="muted" style={{ fontSize: "13px", marginBottom: "1rem" }}>
+          Found a bug or something behaving strangely? Describe it below — it&apos;s emailed
+          straight to us through your own Gmail account.
+        </p>
+        <label style={{ color: "inherit" }}>
+          What happened?
+          <textarea
+            rows={4}
+            value={issueText}
+            onChange={(event) => setIssueText(event.target.value)}
+            placeholder="What were you doing, and what went wrong?"
+          />
+        </label>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="primary"
+            disabled={issuePending || !issueText.trim()}
+            onClick={() => {
+              setIssueError("");
+              setIssueStatus("");
+              startIssueTransition(async () => {
+                const result = await reportIssue(issueText);
+                if (result.ok) {
+                  setIssueStatus("Sent — thanks for the report.");
+                  setIssueText("");
+                } else {
+                  setIssueError(messageOf(result.error, "Could not send that. Try again."));
+                }
+              });
+            }}
+          >
+            {issuePending ? "Sending…" : "Send report"}
+          </button>
+          {issueStatus && <span style={{ fontSize: "12px", color: "var(--accent)" }}>{issueStatus}</span>}
+        </div>
+        {issueError && (
+          <p className="error" style={{ marginTop: "0.5rem" }}>
+            {issueError}
+          </p>
+        )}
+      </section>
 
       <section className="rounded-xl border p-4" style={{ borderColor: "var(--danger)" }}>
         <h2 style={{ color: "var(--danger)", marginBottom: "0.5rem" }}>Danger zone</h2>
