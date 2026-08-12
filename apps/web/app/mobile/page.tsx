@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import Icon from "@/components/Icon";
 import LandingAccordion from "@/components/LandingAccordion";
+import { supportEmail } from "@/lib/site";
 
 /**
  * The mobile marketing landing.
@@ -316,6 +317,17 @@ export default async function Home() {
           <a href="#faq">FAQ</a>
         </nav>
         <span className="text-xs text-muted">Built for people doing their own outreach.</span>
+        <div
+          className="flex w-full flex-wrap items-center justify-center gap-x-5 gap-y-2 pt-5 text-xs text-muted"
+          style={{ borderTop: "1px solid var(--line)" }}
+        >
+          <Link href="/privacy">Privacy policy</Link>
+          <Link href="/terms">Terms of service</Link>
+          <a href={`mailto:${supportEmail}`}>Contact us</a>
+          <a href={`mailto:${supportEmail}?subject=${encodeURIComponent("Issue report — Outreach")}`}>
+            Report an issue
+          </a>
+        </div>
       </footer>
     </main>
   );
