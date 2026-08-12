@@ -18,6 +18,13 @@ export const siteUrl =
     ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
     : "http://localhost:3000");
 
+/** Where "Contact us" and "Report an issue" go for someone who isn't signed
+ *  in yet, so there is no session to send the message through. Falls back to
+ *  the address the signed-in report flow uses server-side, so the two stay
+ *  in sync without being set twice in normal operation. */
+export const supportEmail =
+  process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "support@example.com";
+
 /** Paths behind the login. Everything here is per-user state, so it is kept
  *  out of search results rather than merely being uninteresting to rank. */
 export const PRIVATE_PATHS = [
