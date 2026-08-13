@@ -10,7 +10,7 @@ import type { MetadataRoute } from "next";
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Cold outreach",
+    name: "Outreach",
     short_name: "Outreach",
     description: "Write, send and track personal cold email.",
     start_url: "/dashboard",
