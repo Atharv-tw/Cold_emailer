@@ -198,7 +198,7 @@ export default async function Home() {
         <p className="text-[15px] text-muted" style={{ lineHeight: 1.65 }}>
           Outreach is an email client that connects to your Google account to send emails
           on your behalf and check your inbox for replies. Every email is drafted from what
-          you actually built — nothing sends until you press send.
+          you actually built. Nothing sends until you press send.
         </p>
 
         <div className="flex w-full flex-col gap-3">
