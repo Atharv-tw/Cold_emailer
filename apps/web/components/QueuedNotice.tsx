@@ -36,8 +36,25 @@ const POLL_MS = 15_000;
 /** Give up after ~10 minutes. See `exhausted` below for why this is not forever. */
 const MAX_POLLS = 40;
 
-/** Within this of the due time, start watching for the send. */
-const SOON_MS = 2 * 60 * 1000;
+/**
+ * Inside this of the due time, the answer is "shortly" rather than a clock time.
+ *
+ * Not an exact `due <= now` comparison, which is what this said first and got
+ * wrong. Two reasons it cannot be exact:
+ *
+ * - `due_at` is computed on the server and compared here against the browser's
+ *   clock. A few seconds of skew either way - and there always are a few - left
+ *   the panel reading "Queued for 3:11 PM" at 3:11 PM, correcting itself only on
+ *   a reload once real time had overtaken the difference.
+ * - The worker ticks every two minutes, so a due time is never accurate to the
+ *   second anyway. Displaying one implies a precision that does not exist.
+ *
+ * Matching the tick interval makes skew irrelevant instead of merely smaller.
+ */
+export const SOON_MS = 2 * 60 * 1000;
+
+/** How often the displayed text re-evaluates. Cheaper than a refresh: no network. */
+const CLOCK_MS = 5_000;
 
 function when(value: string): string {
   return new Date(value).toLocaleString(undefined, {
@@ -49,15 +66,20 @@ function when(value: string): string {
 export default function QueuedNotice({ queuedFor }: { queuedFor: string }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
-  // Null until mounted, so the server renders the plain "Queued for ..." and
-  // hydration has nothing to disagree with. Reading the clock during a server
-  // render would make the first paint depend on when it happened.
-  const [nowMs, setNowMs] = useState<number | null>(null);
+  // Read on the server too, so the very first paint is already right. Deferring
+  // it to an effect meant every "queued for now" send rendered as a clock time
+  // first and corrected itself a moment later, which is the flicker this panel
+  // exists to remove. The instant comparison below is timezone-independent, so
+  // the server can do it; `suppressHydrationWarning` covers the case where the
+  // two renders land on opposite sides of the boundary.
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [exhausted, setExhausted] = useState(false);
 
   const due = new Date(queuedFor).getTime();
-  const watching = nowMs !== null && due - nowMs <= SOON_MS;
-  const overdue = nowMs !== null && due <= nowMs;
+  // One threshold, used for both the wording and the watching. "Due inside the
+  // next tick" and "already due" are the same situation to a reader: it is
+  // going out and there is nothing left to do.
+  const imminent = due - nowMs <= SOON_MS;
 
   // A new due time is a new wait: re-arm everything the reschedule invalidated.
   useEffect(() => {
@@ -70,14 +92,19 @@ export default function QueuedNotice({ queuedFor }: { queuedFor: string }) {
 
     // Not close yet: just keep the clock roughly honest so the panel notices
     // when it becomes close. No network, no refresh.
-    if (!watching) {
+    if (!imminent) {
       const id = setInterval(() => setNowMs(Date.now()), 30_000);
       return () => clearInterval(id);
     }
 
+    // The clock ticks faster than the network does. Re-reading the time is
+    // free; asking the server is not, so it stays at POLL_MS.
+    let elapsed = 0;
     let polls = 0;
     const id = setInterval(() => {
       setNowMs(Date.now());
+      elapsed += CLOCK_MS;
+      if (elapsed % POLL_MS !== 0) return;
 
       // A background tab does not need to know. It will refresh on focus, and
       // this keeps a forgotten tab from polling all afternoon.
@@ -89,16 +116,16 @@ export default function QueuedNotice({ queuedFor }: { queuedFor: string }) {
         return;
       }
       startTransition(() => router.refresh());
-    }, POLL_MS);
+    }, CLOCK_MS);
     return () => clearInterval(id);
-  }, [watching, exhausted, queuedFor, router]);
+  }, [imminent, exhausted, queuedFor, router]);
 
   // Once it sends, the parent re-renders with queued_for null and this whole
   // component unmounts, which is what clears the interval.
 
   if (exhausted) {
     return (
-      <div className="note">
+      <div className="note" suppressHydrationWarning>
         <strong>Still queued.</strong>
         <p className="muted">
           This was due at {when(queuedFor)} and has not gone yet — most likely
@@ -109,9 +136,9 @@ export default function QueuedNotice({ queuedFor }: { queuedFor: string }) {
     );
   }
 
-  if (overdue) {
+  if (imminent) {
     return (
-      <div className="note">
+      <div className="note" suppressHydrationWarning>
         <strong>Sending now.</strong>
         <p className="muted">
           Its time has come round, and sends are checked every couple of
@@ -123,7 +150,7 @@ export default function QueuedNotice({ queuedFor }: { queuedFor: string }) {
   }
 
   return (
-    <div className="note">
+    <div className="note" suppressHydrationWarning>
       <strong>Queued for {when(queuedFor)}.</strong>
       <p className="muted">
         Edit the text above and save, and that is what goes out — the time only

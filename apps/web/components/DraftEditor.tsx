@@ -11,7 +11,7 @@ import {
   sendNow,
 } from "@/app/desktop/(app)/dashboard/actions";
 import { ErrorModal, InlineError } from "@/components/ActionError";
-import QueuedNotice from "@/components/QueuedNotice";
+import QueuedNotice, { SOON_MS } from "@/components/QueuedNotice";
 import Working from "@/components/Working";
 import type { ActionError, Result } from "@/lib/result";
 import { useGeminiKey } from "@/lib/useGeminiKey";
@@ -308,13 +308,15 @@ export default function DraftEditor({
             run(async () => {
               need(await saveDraft(target.id, subject, body));
               const result = need(await scheduleSend(target.id));
-              // Same honesty as the panel below: a due time in the past or the
-              // immediate present means "next tick", not that exact minute.
+              // Same threshold as QueuedNotice, and for the same reason: the
+              // due time comes from the server, the clock here is the browser's,
+              // and an exact comparison turns a few seconds of skew into a
+              // promise of a minute that has already passed.
               const at = result.scheduled_for;
               setStatus(
                 !at
                   ? "Queued."
-                  : new Date(at).getTime() <= Date.now()
+                  : new Date(at).getTime() - Date.now() <= SOON_MS
                     ? "Queued — going out in the next couple of minutes."
                     : `Queued for ${when(at)}.`,
               );

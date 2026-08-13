@@ -111,6 +111,7 @@ async def tick(_ctx: dict) -> dict:
     # there is no local `now` here; each send stamps its own.
     rng = random.Random()
     sent = skipped = 0
+    reasons: list[str] = []
 
     async with SessionFactory() as session:
         due = list((await session.execute(_DUE_ROWS, {"limit": MAX_SENDS_PER_TICK * 4})).all())
@@ -180,10 +181,27 @@ async def tick(_ctx: dict) -> dict:
                 )
                 if outcome.sent:
                     sent += 1
-                elif not outcome.retry:
+                else:
+                    # `send_one` knows exactly why it declined and used to
+                    # throw the answer away here, so a send that quietly did
+                    # not happen left the heartbeat saying "skipped 1" and no
+                    # way at all to find out what stopped it. Most of its
+                    # refusals - cap reached, too soon since the last send,
+                    # outside the window - write no event either, by design:
+                    # they are routine and will resolve themselves. Routine is
+                    # not the same as invisible.
+                    logger.info(
+                        "schedule row %s not sent: %s (retry=%s)",
+                        row_id,
+                        outcome.reason,
+                        outcome.retry,
+                    )
+                    reasons.append(outcome.reason)
+
+                if not outcome.sent and not outcome.retry:
                     schedule.state = "cancelled"
                     skipped += 1
-                else:
+                elif not outcome.sent:
                     schedule.attempts += 1
                     skipped += 1
                 await session.commit()
@@ -196,8 +214,15 @@ async def tick(_ctx: dict) -> dict:
                 await session.rollback()
                 logger.exception("tick failed for schedule row %s", row_id)
 
-    await _beat("tick", f"sent {sent}, skipped {skipped}")
-    return {"sent": sent, "skipped": skipped}
+    # The heartbeat is the one place an operator looks without shell access, so
+    # the reasons ride along with the counts. Deduplicated and capped: twenty
+    # rows blocked by the same closed window is one fact, not twenty.
+    detail = f"sent {sent}, skipped {skipped}"
+    if reasons:
+        unique = list(dict.fromkeys(reasons))[:3]
+        detail += " (" + "; ".join(unique) + ")"
+    await _beat("tick", detail)
+    return {"sent": sent, "skipped": skipped, "reasons": list(dict.fromkeys(reasons))}
 
 
 async def renew_watches(_ctx: dict) -> dict:
