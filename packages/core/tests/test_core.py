@@ -32,7 +32,7 @@ from outreach_core.mime import (  # noqa: E402
     Outgoing, SenderIdentity, build_message, extend_references, signature, to_gmail_raw,
 )
 from outreach_core.scheduling import (  # noqa: E402
-    ScheduleError, SendingWindow, next_sending_day, schedule_step,
+    SEND_SOON_DELAY, ScheduleError, SendingWindow, next_sending_day, schedule_step,
 )
 from outreach_core.templating import (  # noqa: E402
     TemplateError, expand_spintax, lint, render, render_draft, template_fields,
@@ -142,6 +142,43 @@ class TestScheduling(unittest.TestCase):
         late = datetime(2026, 8, 7, 23, 0, tzinfo=IST).astimezone(timezone.utc)
         due = schedule_step(late, 0, self.window, self.rng).astimezone(IST)
         self.assertEqual(due.date().isoformat(), "2026-08-10")
+
+    # -------------------------------------------------- "as soon as possible"
+    #
+    # Never the current instant. A due time that is already past the moment it
+    # is written cannot be displayed honestly - see SEND_SOON_DELAY.
+
+    def test_asap_is_placed_ahead_of_now_not_at_it(self):
+        """Whatever else it is, it is in the future. Every time, not usually."""
+        afternoon = datetime(2026, 8, 3, 16, 30, tzinfo=IST).astimezone(timezone.utc)
+        for _ in range(200):
+            due = schedule_step(afternoon, 0, self.window, random.Random())
+            self.assertGreater(due, afternoon)
+
+    def test_asap_lands_two_minutes_out(self):
+        # Seed 1 picks a slot earlier than 16:30, so the "already passed, send
+        # as soon as possible" branch is the one taken - which is the branch
+        # under test, and asserting it unconditionally is the point.
+        afternoon = datetime(2026, 8, 3, 16, 30, tzinfo=IST).astimezone(timezone.utc)
+        due = schedule_step(afternoon, 0, self.window, random.Random(1))
+        self.assertEqual(due, afternoon + SEND_SOON_DELAY)
+
+    def test_asap_never_lands_outside_the_window(self):
+        """The edge the delay introduces: two minutes past 16:59 is closing time.
+
+        Scheduling one minute after the window shuts produces a row the worker
+        refuses for the rest of the evening, so this has to roll to tomorrow
+        instead.
+        """
+        closing = datetime(2026, 8, 3, 16, 59, tzinfo=IST).astimezone(timezone.utc)
+        for _ in range(50):
+            due = schedule_step(closing, 0, self.window, random.Random())
+            self.assertTrue(self.window.is_sending_time(due))
+
+    def test_asap_at_the_very_edge_rolls_to_the_next_day(self):
+        closing = datetime(2026, 8, 3, 16, 59, tzinfo=IST).astimezone(timezone.utc)
+        due = schedule_step(closing, 0, self.window, random.Random(7)).astimezone(IST)
+        self.assertEqual(due.date().isoformat(), "2026-08-04")
 
     def test_is_sending_time(self):
         self.assertTrue(self.window.is_sending_time(datetime(2026, 8, 3, 10, 0, tzinfo=IST)))

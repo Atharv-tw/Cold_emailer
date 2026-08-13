@@ -25,6 +25,21 @@ WEEKDAYS = ("mon", "tue", "wed", "thu", "fri")
 # search for the next sending day would spin forever.
 MAX_LOOKAHEAD_DAYS = 21
 
+# How far ahead "as soon as possible" is placed.
+#
+# This used to be zero - a send whose slot had already passed was due at the
+# current instant. Nothing was wrong with that mechanically; the worker picks
+# the row up on its next pass either way. It was wrong to *read*: the UI showed
+# "Queued for 3:11 PM" at 3:11 PM and the mail left at 3:14, so the one number
+# on screen was already false when it was written, and there was no honest way
+# to render it.
+#
+# Matching the worker's tick interval makes the promise keepable instead. The
+# row becomes due at a time that is still ahead when it is displayed, and the
+# next tick after it is the one that sends. Costs two minutes on a send that
+# was already going to wait up to two minutes for the tick.
+SEND_SOON_DELAY = timedelta(minutes=2)
+
 
 class ScheduleError(Exception):
     pass
@@ -143,9 +158,19 @@ def schedule_step(
     candidate = datetime.combine(target, slot, tzinfo=tz)
 
     if candidate <= local_now:
-        if window.is_sending_time(local_now) and target == local_now.date():
-            candidate = local_now
+        # The slot picked for today has already gone by. Send as soon as
+        # possible, which is `SEND_SOON_DELAY` from now rather than this
+        # instant - see the constant for why a due time in the past is a
+        # display problem with no good answer.
+        soon = local_now + SEND_SOON_DELAY
+        if target == local_now.date() and window.is_sending_time(soon):
+            candidate = soon
         else:
+            # Either today is not a sending day, or the two minutes would carry
+            # this past the end of the window. Both mean the next day, and the
+            # second is the reason the check is on `soon` and not on `local_now`:
+            # scheduling a send for one minute after closing time produces a row
+            # the worker refuses all evening.
             following = next_sending_day(local_now.date(), window, inclusive=False)
             candidate = datetime.combine(
                 following, random_time_in_window(window, rng), tzinfo=tz
