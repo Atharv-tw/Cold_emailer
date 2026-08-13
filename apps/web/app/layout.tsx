@@ -11,10 +11,10 @@ export const metadata: Metadata = {
   // out blank.
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Cold outreach - write, send and track personal cold email",
+    default: "Outreach - write, send and track personal cold email",
     // Child pages set a bare title ("Targets") and get the brand appended, so
     // no page has to remember to repeat it.
-    template: "%s · Cold outreach",
+    template: "%s · Outreach",
   },
   description: DESCRIPTION,
   applicationName: "Outreach",
@@ -24,15 +24,15 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     url: "/",
-    siteName: "Cold outreach",
-    title: "Cold outreach - write, send and track personal cold email",
+    siteName: "Outreach",
+    title: "Outreach - write, send and track personal cold email",
     description: DESCRIPTION,
     locale: "en_GB",
     images: [{ url: "/og.png", width: 1200, height: 630, alt: "Outreach" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Cold outreach - write, send and track personal cold email",
+    title: "Outreach - write, send and track personal cold email",
     description: DESCRIPTION,
     images: ["/og.png"],
   },

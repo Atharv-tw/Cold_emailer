@@ -196,9 +196,9 @@ export default async function Home() {
 
         {/* Sub copy */}
         <p className="relative z-[1] max-w-xl text-lg text-muted" style={{ lineHeight: 1.7 }}>
-          Sign in with Google, add your resume, and add the people you want to
-          reach. Every email is drafted from what you actually built — nothing
-          sends until you press send.
+          Outreach is an email client that connects to your Google account to send
+          emails on your behalf and check your inbox for replies. Every email is
+          drafted from what you actually built — nothing sends until you press send.
         </p>
 
         {/* CTAs */}
