@@ -85,8 +85,8 @@ export default function SettingsForm({ user }: { user: SessionUser }) {
           {savedFlash && <span style={{ fontSize: "12px", color: "var(--accent)" }}>Saved.</span>}
         </div>
         <p className="muted" style={{ fontSize: "12px", marginTop: "0.75rem" }}>
-          Kept only in this browser tab — never sent anywhere but the API, and gone the moment you
-          close the tab. There is no server-side key: this is the only one the app has. Get a free
+          Kept locally in your browser — never sent anywhere but the API.
+          There is no server-side key: this is the only one the app has. Get a free
           key at{" "}
           <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">
             aistudio.google.com/apikey
