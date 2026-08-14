@@ -13,6 +13,17 @@ import { cookies, headers } from "next/headers";
 const API_BASE = process.env.API_BASE_URL ?? "http://localhost:8000";
 
 export class ApiError extends Error {
+  /**
+   * A duck-typing marker `result.ts` checks for instead of `instanceof` or
+   * `constructor.name`. Both break once this file is bundled for a client
+   * component that only wants `messageOf` and a minifier renames the class -
+   * `instanceof` would also need importing this whole module (with its
+   * server-only `next/headers` dependency) into code that has to stay
+   * import-safe from the client. A string property key survives minification
+   * untouched, so this does not.
+   */
+  readonly isApiError = true as const;
+
   constructor(
     readonly status: number,
     message: string,

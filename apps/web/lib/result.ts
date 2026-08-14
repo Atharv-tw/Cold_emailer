@@ -28,12 +28,24 @@ export type Result<T> = { ok: true; data: T } | { ok: false; error: ActionError 
  *
  * Only `ApiError` is caught. A TypeError from a bug in the action body is not
  * something to render at the user, so it is left to throw.
+ *
+ * Checked via the `isApiError` marker rather than `instanceof` or
+ * `constructor.name`: `instanceof` would mean statically importing
+ * `lib/api.ts` here, and that file needs `next/headers` - fine for the
+ * server actions that use this, not fine for the client components (see
+ * `SettingsForm.tsx`) that import `messageOf` from this same file. And
+ * `constructor.name` is a string that a production minifier is free to
+ * rename, which is exactly what silently broke this check: a real 409 ("too
+ * soon since the last touch") fell through to the generic "Something went
+ * wrong" because the class name it was compared against was never "ApiError"
+ * once minified - only exercised in dev, where nothing is minified. A
+ * property key like `isApiError` is not renamed by default.
  */
 export async function attempt<T>(run: () => Promise<T>): Promise<Result<T>> {
   try {
     return { ok: true, data: await run() };
   } catch (caught: any) {
-    if (caught && caught.constructor && caught.constructor.name === "ApiError") {
+    if (caught && caught.isApiError === true) {
       return { ok: false, error: { code: caught.code, message: caught.message } };
     }
     // `fetch()` itself failing - the API unreachable, the connection dropped
