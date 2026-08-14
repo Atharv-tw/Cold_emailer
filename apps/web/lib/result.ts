@@ -36,6 +36,17 @@ export async function attempt<T>(run: () => Promise<T>): Promise<Result<T>> {
     if (caught && caught.constructor && caught.constructor.name === "ApiError") {
       return { ok: false, error: { code: caught.code, message: caught.message } };
     }
+    // `fetch()` itself failing - the API unreachable, the connection dropped
+    // mid-request - throws a `TypeError` with this exact message in Node's
+    // fetch implementation. It is not a bug in the action, and unlike a real
+    // bug it names nothing worth hiding, so it gets a real message instead of
+    // joining the rest under Next.js's generic digest.
+    if (caught instanceof TypeError && caught.message === "fetch failed") {
+      return {
+        ok: false,
+        error: { code: "network_error", message: "Could not reach the server. Try again." },
+      };
+    }
     throw caught;
   }
 }

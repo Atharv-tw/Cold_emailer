@@ -12,11 +12,10 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, status
-from pydantic import BaseModel
-from sqlalchemy import select
-
 from outreach_core.limits import MIN_BUSINESS_DAYS_BETWEEN_TOUCHES
 from outreach_core.scheduling import schedule_step
+from pydantic import BaseModel
+from sqlalchemy import select
 
 from .. import errors
 from ..deps import CurrentUser, Db, SettingsDep
@@ -114,21 +113,17 @@ async def schedule_send(
     window = window_for(profile)
     due = schedule_step(datetime.now(timezone.utc), 0, window, random.Random())
 
-    # Same gap this goes through again at send time (services/sending.py) -
-    # checked here too so a reschedule gets a clear refusal instead of
-    # silently overwriting a correctly future-dated row with one that will
-    # just fail, and keep failing, every time the worker picks it up.
+    # "Next window" means "as soon as possible", and for a follow-up "as soon
+    # as possible" is not always today - the gap is a floor, not a suggestion.
+    # Clamp to it rather than reject: a false "queued" was the actual bug this
+    # replaced (see the send-time guard in services/sending.py, which still
+    # backstops this), so the honest fix is to pick the earliest time that is
+    # actually allowed, which is what the button already claims to do.
     if target.last_touch_at is not None:
         earliest = schedule_step(
             target.last_touch_at, MIN_BUSINESS_DAYS_BETWEEN_TOUCHES, window, random.Random()
         )
-        if due < earliest:
-            raise AppError(
-                status.HTTP_409_CONFLICT,
-                errors.SEND_BLOCKED,
-                f"Too soon since the last touch - the earliest this can go out "
-                f"is {earliest.isoformat(timespec='minutes')}.",
-            )
+        due = max(due, earliest)
 
     existing = await session.scalar(
         select(ScheduleRow).where(ScheduleRow.target_id == target.id, ScheduleRow.step == step)
