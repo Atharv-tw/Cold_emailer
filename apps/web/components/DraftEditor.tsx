@@ -272,6 +272,12 @@ export default function DraftEditor({
                   ? "Saved. This is what goes out at the queued time."
                   : "Saved as a draft. Nothing has been sent.",
               );
+              // A follow-up can go from "nothing queued" to "queued" the
+              // moment its draft gets a body (see dashboard.py's `drafted`
+              // gate) - refresh so the button set reflects that immediately
+              // instead of still offering Send now/Send in my next window
+              // on a row that is actually locked to its scheduled date.
+              router.refresh();
             })
           }
         >
