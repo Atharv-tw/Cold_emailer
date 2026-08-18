@@ -16,6 +16,7 @@ const NAV_ITEMS: { label: string; href: string; icon: IconName }[] = [
   { label: "Dashboard", href: "/dashboard", icon: "grid" },
   { label: "Targets", href: "/targets", icon: "users" },
   { label: "Sent Emails", href: "/emails", icon: "send" },
+  { label: "Trackers", href: "/trackers", icon: "search" },
   { label: "Analytics", href: "/analytics", icon: "chart" },
 ];
 
