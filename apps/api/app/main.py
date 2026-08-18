@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .db import engine
 from .routers import (
     admin, analytics, auth, billing, dashboard, drafts, gmail_push, health, import_leads,
-    messages, ops, pool, profile, resumes, send, support, targets, templates,
+    messages, ops, pool, profile, resumes, send, support, targets, templates, trackers,
 )
 from .settings import get_settings
 
@@ -70,5 +70,6 @@ app.include_router(ops.router)
 app.include_router(gmail_push.router)
 app.include_router(billing.router)
 app.include_router(support.router)
+app.include_router(trackers.router)
 # Last, and every route on it behind AdminUser.
 app.include_router(admin.router)

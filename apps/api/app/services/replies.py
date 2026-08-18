@@ -35,7 +35,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from outreach_core.classify import Inbound, Verdict, classify
 
-from ..models import DeadAddress, Event, Target, TargetReply, User
+from ..models import DeadAddress, Event, Target, TargetReply, User, TrackedThread, TrackedSender
 from .gmail import GmailClient, GmailError, GmailNotFound
 from .sending import stop_sequence, suppress
 
@@ -334,6 +334,62 @@ async def handle_history(
         outcome = await process_thread(session, user=user, target=target, gmail=gmail)
         if outcome is not None:
             outcomes.append(outcome)
+
+    tracked_threads = list(
+        await session.scalars(
+            select(TrackedThread).where(
+                TrackedThread.user_id == user.id, 
+                TrackedThread.gmail_thread_id.in_(thread_ids),
+                TrackedThread.status == "pending"
+            )
+        )
+    )
+    
+    now = datetime.now(timezone.utc)
+    for tt in tracked_threads:
+        try:
+            thread = await gmail.get_thread(tt.gmail_thread_id)
+        except GmailNotFound:
+            continue
+            
+        inbound_ids = [
+            str(message.get("id"))
+            for message in thread.get("messages") or []
+            if not _is_from_user(headers_of(message.get("payload") or {}), user.email)
+        ]
+        if inbound_ids:
+            tt.status = "replied"
+            tt.notified_at = now
+            session.add(Event(user_id=user.id, type="tracked_thread_replied", detail=tt.subject))
+
+    tracked_senders = list(
+        await session.scalars(
+            select(TrackedSender).where(
+                TrackedSender.user_id == user.id, TrackedSender.status == "active"
+            )
+        )
+    )
+    if tracked_senders:
+        new_msg_ids = [
+            str(message.get("id"))
+            for record in history.get("history") or []
+            for added in record.get("messagesAdded") or []
+            for message in [added.get("message") or {}]
+            if message.get("id")
+        ]
+        for msg_id in new_msg_ids:
+            try:
+                full_msg = await gmail.get_message(msg_id)
+            except GmailError:
+                continue
+                
+            headers = headers_of(full_msg.get("payload") or {})
+            sender = headers.get("From", "").lower()
+            
+            for ts in tracked_senders:
+                if ts.email.lower() in sender:
+                    ts.last_received_at = now
+                    session.add(Event(user_id=user.id, type="tracked_sender_received", detail=ts.email))
 
     return outcomes, int(history.get("historyId", start_history_id))
 

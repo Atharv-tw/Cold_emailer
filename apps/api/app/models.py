@@ -604,6 +604,41 @@ class PaymentRequest(Base, TimestampMixin):
     notify_error: Mapped[str] = mapped_column(Text, default="")
 
 
+class TrackedThread(Base, TimestampMixin):
+    """A single Gmail thread being tracked for replies ad-hoc."""
+    
+    __tablename__ = "tracked_threads"
+    
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    gmail_thread_id: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    subject: Mapped[str] = mapped_column(Text, default="")
+    
+    # pending | replied
+    status: Mapped[str] = mapped_column(String(32), default="pending", index=True)
+    notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class TrackedSender(Base, TimestampMixin):
+    """A specific email address being monitored for any incoming message."""
+    
+    __tablename__ = "tracked_senders"
+    __table_args__ = (UniqueConstraint("user_id", "email", name="uq_tracked_senders_user_email"),)
+    
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    email: Mapped[str] = mapped_column(String(320), nullable=False)
+    
+    # active | paused
+    status: Mapped[str] = mapped_column(String(32), default="active", index=True)
+    last_received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+
 # Tables carrying a user_id, used by the migration to switch RLS on uniformly
 # rather than by a hand-maintained list that drifts from the models.
 #
@@ -621,5 +656,6 @@ class PaymentRequest(Base, TimestampMixin):
 USER_SCOPED_TABLES = [
     "google_tokens", "gmail_watch", "profiles", "profile_projects",
     "profile_experience", "resumes", "targets", "target_replies", "messages",
-    "schedule", "events", "suppression", "push_subs",
+    "schedule", "events", "suppression", "push_subs", "tracked_threads",
+    "tracked_senders"
 ]
