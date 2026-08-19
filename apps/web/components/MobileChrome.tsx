@@ -30,7 +30,7 @@ const TABS: { label: string; href: string; icon: IconName }[] = [
 // The rest of the desktop rail, reached through the More sheet. Split by how
 // often somebody opens them, not by how much they matter.
 const MORE_ITEMS: { label: string; href: string; icon: IconName }[] = [
-  { label: "Trackers", href: "/trackers", icon: "search" },
+  { label: "Trackers", href: "/trackers", icon: "bell" },
   { label: "Analytics", href: "/analytics", icon: "chart" },
   { label: "Profile", href: "/profile", icon: "user" },
   { label: "Settings", href: "/settings", icon: "settings" },
